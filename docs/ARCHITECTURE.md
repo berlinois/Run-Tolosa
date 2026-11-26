@@ -122,6 +122,11 @@ réglés sur une vraie marche : un point par seconde, précision médiane de 4,5
      service, accès privés, trottoirs et passages piétons.
    - Chaque voie est coupée aux intersections, et le résultat va dans
      `public/streets/toulouse.json`.
+   - Chaque tronçon est rattaché à l'un des **20 quartiers officiels**
+     (OSM `admin_level=10`), pour les futures stats par quartier.
+   - Volume : environ 37 800 tronçons, 1 940 km, 4,2 Mo.
+   - L'extraction tourne dans GitHub Actions (workflow « Extraction des rues
+     OSM », lancé à la main), qui commite le fichier.
 2. **Les points de la trace** : on garde les points dont la précision est
    inférieure ou égale à 25 m, et on comble les trous de moins de 40 m (un point
    tous les 3 m).
