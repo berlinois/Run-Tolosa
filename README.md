@@ -20,18 +20,32 @@ de serveur, pas de compte, pas d'abonnement. **Coût : 0 €.**
 Le détail est dans [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) : découpage,
 flux de données et feuille de route.
 
-## Installer l'appli sur le téléphone
+## Installer l'appli et recevoir les mises à jour
 
-1. Sur le téléphone, ouvrir la dernière Release :
-   `https://github.com/berlinois/run-tolosa/releases/latest`
-2. Télécharger `run-tolosa.apk`.
-3. Android demande d'autoriser l'installation depuis le navigateur : accepter,
-   une seule fois.
-4. Pour une mise à jour, refaire la même chose. L'APK est toujours signé avec la
-   même clé, donc il s'installe par-dessus sans perdre les données.
+Les mises à jour passent par **[Obtainium](https://github.com/ImranR98/Obtainium)**,
+une appli open source qui surveille les Releases GitHub. Elle n'est pas sur le
+Play Store.
 
-> Le repo est privé ? Le lien marche si le navigateur du téléphone est connecté
-> à GitHub. Sinon, l'APK est aussi dans les artefacts de chaque run Actions.
+1. Installer Obtainium depuis ses Releases GitHub, en prenant le fichier
+   `app-arm64-v8a-release.apk`.
+2. Le repo est privé : créer un token GitHub en lecture seule.
+   - Le créer sur https://github.com/settings/personal-access-tokens/new, en
+     type « fine-grained ».
+   - Le limiter au repo `Run-Tolosa`, avec la permission **Contents: Read-only**.
+   - Dans Obtainium : Réglages → Source GitHub → Personal Access Token, coller
+     le token.
+3. Dans Obtainium : Ajouter une appli → `https://github.com/berlinois/Run-Tolosa`
+   → Installer.
+4. Activer la vérification des mises à jour en arrière-plan dans les réglages
+   d'Obtainium.
+
+À chaque push, la CI publie une Release. Obtainium envoie alors une notification,
+et un tap installe la nouvelle version. Les APK sont toujours signés avec la même
+clé, donc la mise à jour s'installe par-dessus sans perdre les données. La version
+installée est affichée en bas de la légende.
+
+> Pas d'auto-update intégrée à l'appli : la permission `REQUEST_INSTALL_PACKAGES`
+> faisait bloquer l'APK par Google Play Protect.
 
 ## Pipeline
 

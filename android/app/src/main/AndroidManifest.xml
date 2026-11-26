@@ -24,6 +24,11 @@
 
         </activity>
 
+        <service
+            android:name=".tracking.TrackingService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -39,10 +44,13 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- Géolocalisation (Phase 0 : premier plan uniquement) -->
+    <!-- Géolocalisation (« pendant l'utilisation » suffit grâce au foreground service) -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
-    <!-- Phase 1 (plugin Java de tracking) ajoutera :
-         FOREGROUND_SERVICE, FOREGROUND_SERVICE_LOCATION, POST_NOTIFICATIONS -->
+
+    <!-- Enregistrement des marches écran éteint (TrackingService) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

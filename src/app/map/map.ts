@@ -4,14 +4,18 @@ import {
   ElementRef,
   OnDestroy,
   afterNextRender,
+  effect,
   inject,
   signal,
   viewChild,
 } from '@angular/core';
+import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { Map as MlMap, type GeoJSONSource } from 'maplibre-gl';
 import { COVERAGE_LEVELS, coverageColorExpression } from '../core/coverage-style';
 import { DEMO_STREETS } from '../core/demo-streets';
 import { LocationService } from '../core/location.service';
+import { TrackingStore } from '../tracking/tracking.store';
 
 const TOULOUSE_CENTER: [number, number] = [1.4442, 43.6045];
 /** Fond de carte gratuit, sans clé. Phase 2 : PMTiles de Toulouse embarqué (hors ligne). */
@@ -27,10 +31,13 @@ const BASEMAP_STYLE = 'https://tiles.openfreemap.org/styles/positron';
       @for (level of levels; track level.minPassages) {
         <div><span class="swatch" [style.background]="level.color"></span>{{ level.label }}</div>
       }
+      @if (version(); as v) {
+        <div class="version">v{{ v }}</div>
+      }
     </aside>
 
-    <button class="locate" type="button" (click)="locate()" [disabled]="locating()">
-      {{ locating() ? '…' : '📍 Me localiser' }}
+    <button class="locate" type="button" (click)="locate()" [disabled]="locating()" aria-label="Me localiser">
+      {{ locating() ? '…' : '📍' }}
     </button>
 
     @if (status(); as msg) {
@@ -45,14 +52,15 @@ const BASEMAP_STYLE = 'https://tiles.openfreemap.org/styles/positron';
       background: #fffe; border-radius: 8px; padding: 6px 10px; font-size: 12px;
       box-shadow: 0 1px 4px #0003;
     }
+    .version { margin-top: 4px; color: #757575; font-size: 11px; }
     .swatch { display: inline-block; width: 18px; height: 4px; margin-right: 6px; vertical-align: middle; border-radius: 2px; }
     .locate {
-      position: absolute; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 24px);
-      padding: 12px 16px; border: 0; border-radius: 24px; font-size: 15px;
-      background: #1e88e5; color: #fff; box-shadow: 0 2px 6px #0004;
+      position: absolute; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 20px);
+      width: 56px; height: 56px; border: 0; border-radius: 50%; font-size: 22px;
+      background: #fff; box-shadow: 0 2px 6px #0004;
     }
     .status {
-      position: absolute; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 80px);
+      position: absolute; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 140px);
       margin: 0; padding: 8px 10px; background: #000c; color: #fff; border-radius: 8px; font-size: 13px;
     }
   `,
@@ -60,14 +68,31 @@ const BASEMAP_STYLE = 'https://tiles.openfreemap.org/styles/positron';
 export class MapView implements OnDestroy {
   private readonly mapEl = viewChild.required<ElementRef<HTMLDivElement>>('mapEl');
   private readonly location = inject(LocationService);
+  private readonly tracking = inject(TrackingStore);
   private map?: MlMap;
+  private readonly mapLoaded = signal(false);
 
   protected readonly levels = COVERAGE_LEVELS;
   protected readonly locating = signal(false);
   protected readonly status = signal<string | null>(null);
+  protected readonly version = signal<string | null>(null);
 
   constructor() {
     afterNextRender(() => this.initMap());
+    this.tracking.init();
+    if (Capacitor.isNativePlatform()) {
+      void App.getInfo().then((info) => this.version.set(info.version));
+    }
+
+    // Traces brutes : marches terminées (violet) et marche en cours (rouge).
+    effect(() => {
+      if (!this.mapLoaded()) return;
+      (this.map?.getSource('walks') as GeoJSONSource | undefined)?.setData(this.tracking.pastTracks());
+    });
+    effect(() => {
+      if (!this.mapLoaded()) return;
+      (this.map?.getSource('live') as GeoJSONSource | undefined)?.setData(this.tracking.liveLine());
+    });
   }
 
   private initMap(): void {
@@ -95,6 +120,24 @@ export class MapView implements OnDestroy {
         },
       });
 
+      const empty = { type: 'FeatureCollection' as const, features: [] };
+      map.addSource('walks', { type: 'geojson', data: empty });
+      map.addLayer({
+        id: 'walks',
+        type: 'line',
+        source: 'walks',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#7e57c2', 'line-width': 3, 'line-opacity': 0.6 },
+      });
+      map.addSource('live', { type: 'geojson', data: empty });
+      map.addLayer({
+        id: 'live',
+        type: 'line',
+        source: 'live',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#e53935', 'line-width': 4 },
+      });
+
       map.addSource('me', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addLayer({
         id: 'me',
@@ -107,6 +150,7 @@ export class MapView implements OnDestroy {
           'circle-stroke-color': '#fff',
         },
       });
+      this.mapLoaded.set(true);
     });
   }
 
