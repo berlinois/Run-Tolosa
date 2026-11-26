@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Run Tolosa</string>
+    <string name="title_activity_main">Run Tolosa</string>
+    <string name="package_name">fr.runtolosa.app</string>
+    <string name="custom_url_scheme">fr.runtolosa.app</string>
+</resources>

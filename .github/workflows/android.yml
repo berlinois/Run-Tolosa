@@ -1,0 +1,73 @@
+name: Android APK
+
+# Chaque push : tests + build web + APK (artefact téléchargeable).
+# Push sur la branche par défaut : en plus, une Release GitHub avec l'APK,
+# téléchargeable directement depuis le téléphone.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # nécessaire pour créer la Release
+    env:
+      VERSION_CODE: ${{ github.run_number }}
+      VERSION_NAME: 0.1.${{ github.run_number }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Tests unitaires
+        run: npx ng test --watch=false
+
+      - name: Build Angular
+        run: npx ng build
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Capacitor sync
+        run: npx cap sync android
+
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Renommer l'APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk run-tolosa.apk
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: run-tolosa-${{ env.VERSION_NAME }}
+          path: run-tolosa.apk
+          retention-days: 30
+
+      - name: Release GitHub (branche par défaut uniquement)
+        if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${VERSION_NAME}" run-tolosa.apk \
+            --target "${GITHUB_SHA}" \
+            --title "Run Tolosa ${VERSION_NAME}" \
+            --notes "APK généré par la CI (run #${{ github.run_number }}, commit ${GITHUB_SHA::7})." \
+            --latest
