@@ -138,6 +138,10 @@ src/app/
     tracking.store.ts      état des marches (signals)            ✅ Phase 1
     track-geo.ts           traces → GeoJSON, formats             ✅ Phase 1
     walk-controls.ts       Démarrer / Arrêter, chrono            ✅ Phase 1
+  export/
+    export-button.ts       bouton ⤓ + popup d'extraction         ✅ Phase 1
+android/app/src/main/java/fr/runtolosa/app/
+  export/ExportPlugin.java zip → Téléchargements ou sélecteur    ✅ Phase 1
 android/app/src/main/java/fr/runtolosa/app/tracking/
   TrackingPlugin.java      API exposée à Angular                 ✅ Phase 1
   TrackingService.java     foreground service GPS                ✅ Phase 1

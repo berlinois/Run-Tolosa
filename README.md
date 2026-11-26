@@ -4,6 +4,23 @@ Appli Android perso pour colorier, sur la carte de Toulouse, toutes les rues
 dans lesquelles je suis passé en marchant. Tout reste sur le téléphone : pas
 de serveur, pas de compte, pas d'abonnement. **Coût : 0 €.**
 
+## Features
+
+| Feature | Description | État |
+|---|---|---|
+| **Carte de Toulouse** | Fond de carte OpenFreeMap affiché avec MapLibre, sans clé d'API | ✅ |
+| **Me localiser** | Bouton rond 📍 : position actuelle et précision du GPS | ✅ |
+| **Enregistrer une marche** | Bouton « Démarrer / Arrêter ». Le GPS est lu toutes les 2 s, **même écran éteint**, avec une notification qui affiche la distance et un bouton Arrêter | ✅ |
+| **Suivi en direct** | Chrono, distance et nombre de points. Trace en cours en rouge | ✅ |
+| **Historique des traces** | Toutes les marches terminées sont affichées en violet sur la carte | ✅ |
+| **Données brutes conservées** | Chaque point GPS est écrit sur le disque dès sa réception et n'est jamais modifié | ✅ |
+| **Extraire mes marches** | Bouton rond ⤓, puis une popup de confirmation. Le zip des traces brutes va dans **Téléchargements** par défaut, ou à un autre emplacement au choix | ✅ |
+| **Version affichée** | En bas de la légende | ✅ |
+| **Mises à jour en un tap** | Via Obtainium, à chaque Release produite par la CI | ✅ |
+| **Rues coloriées** | Tronçons OSM de Toulouse, coloriés selon le nombre de passages (≥ 60 % du tronçon parcouru) | ⏳ Phase 2 |
+| **Carte hors ligne** | Fond PMTiles de Toulouse embarqué | ⏳ Phase 3 |
+| **Stats** | % de Toulouse parcouru, km, quartiers, couleurs selon l'ancienneté | ⏳ Phase 4 |
+
 ## Stack retenue
 
 | Brique | Choix | Pourquoi |
