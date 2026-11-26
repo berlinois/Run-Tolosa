@@ -1,0 +1,39 @@
+name: Extraction des rues OSM
+
+# Régénère public/streets/toulouse.json depuis OpenStreetMap (Overpass)
+# et le commite sur la branche. Lancement manuel, ou quand le script change.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - scripts/extract-streets.mjs
+      - .github/workflows/extract-streets.yml
+
+concurrency:
+  group: extract-streets-${{ github.ref }}
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Extraction
+        run: node scripts/extract-streets.mjs
+
+      - name: Commit du référentiel
+        run: |
+          if git diff --quiet -- public/streets 2>/dev/null && [ -z "$(git status --porcelain public/streets)" ]; then
+            echo "Aucun changement"; exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/streets
+          git commit -m "Rues OSM de Toulouse régénérées [skip ci]"
+          git push

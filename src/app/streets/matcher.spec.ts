@@ -11,7 +11,7 @@ function seg(id: string, len: number, north = 0, east = 0): StreetSegment {
   const lat = LAT0 + north * DLAT;
   const a: [number, number] = [LON0 + east * DLON, lat];
   const b: [number, number] = [LON0 + (east + len) * DLON, lat];
-  return { id, name: id, highway: 'residential', lengthM: len, coords: [a, b], bbox: [a[0], lat, b[0], lat] };
+  return { id, name: id, highway: 'residential', district: '', lengthM: len, coords: [a, b], bbox: [a[0], lat, b[0], lat] };
 }
 
 /** Marche en ligne droite est-ouest de `from` à `to` m, un point par 1,5 m, décalée de `north` m. */
@@ -41,7 +41,7 @@ describe('matchWalk', () => {
     // Rue nord-sud de 80 m traversée au milieu par la marche est-ouest.
     const lon = LON0 + 50 * DLON;
     const cross: StreetSegment = {
-      id: 'croisee', name: '', highway: 'residential', lengthM: 80,
+      id: 'croisee', name: '', highway: 'residential', district: '', lengthM: 80,
       coords: [[lon, LAT0 - 40 * DLAT], [lon, LAT0 + 40 * DLAT]],
       bbox: [lon, LAT0 - 40 * DLAT, lon, LAT0 + 40 * DLAT],
     };

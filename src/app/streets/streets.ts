@@ -4,14 +4,17 @@ export interface StreetsFile {
   version: string;
   names: string[];
   highways: string[];
-  /** [id, nameIndex, highwayIndex, lengthM, [lon, lat, lon, lat, …]] */
-  segments: [string, number, number, number, number[]][];
+  districts: string[];
+  /** [id, nameIndex, highwayIndex, lengthM, districtIndex (-1 = aucun), [lon, lat, lon, lat, …]] */
+  segments: [string, number, number, number, number, number[]][];
 }
 
 export interface StreetSegment {
   id: string;
   name: string;
   highway: string;
+  /** Quartier (vide si inconnu). */
+  district: string;
   lengthM: number;
   /** [lon, lat][] */
   coords: [number, number][];
@@ -26,7 +29,7 @@ export interface Streets {
 }
 
 export function parseStreets(file: StreetsFile): Streets {
-  const segments = file.segments.map(([id, n, h, lengthM, flat]) => {
+  const segments = file.segments.map(([id, n, h, lengthM, d, flat]) => {
     const coords: [number, number][] = [];
     let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
     for (let i = 0; i < flat.length; i += 2) {
@@ -41,6 +44,7 @@ export function parseStreets(file: StreetsFile): Streets {
       id,
       name: file.names[n] ?? '',
       highway: file.highways[h] ?? '',
+      district: file.districts[d] ?? '',
       lengthM,
       coords,
       bbox: [minLon, minLat, maxLon, maxLat] as [number, number, number, number],
