@@ -76,7 +76,7 @@ import { TrackingStore } from './tracking.store';
     .dialog p { margin: 0; color: #424242; font-size: 15px; line-height: 1.4; }
     .actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
     .actions button { padding: 10px 16px; font-size: 15px; box-shadow: none; }
-    .keep { background: transparent; color: #1e88e5; }
+    .keep { background: transparent; color: #B8505E; }
     .delete { background: #c62828; }
     .error { padding: 8px 10px; background: #000c; color: #fff; border-radius: 8px; font-size: 13px; }
   `,

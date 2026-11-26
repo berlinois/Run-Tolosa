@@ -16,6 +16,7 @@ de serveur, pas de compte, pas d'abonnement. **Coût : 0 €.**
 | **Historique des traces** | Toutes les marches terminées sont affichées en violet sur la carte | ✅ |
 | **Données brutes conservées** | Chaque point GPS est écrit sur le disque dès sa réception et n'est jamais modifié | ✅ |
 | **Extraire mes marches** | Bouton rond ⤓, puis une popup de confirmation. Le zip des traces brutes va dans **Téléchargements** par défaut, ou à un autre emplacement au choix | ✅ |
+| **Logo** | Le clocher de Saint-Sernin au bout d'une marche dorée, avec la Garonne, sur fond rose brique. Icône Android adaptative et ronde, écran de démarrage. Source : `design/icon.svg`, régénération : `node scripts/generate-icons.mjs` | ✅ |
 | **Version affichée** | En bas de la légende | ✅ |
 | **Mises à jour en un tap** | Via Obtainium, à chaque Release produite par la CI | ✅ |
 | **Rues coloriées** | Tronçons OSM de Toulouse, coloriés selon le nombre de passages (≥ 60 % du tronçon parcouru) | ⏳ Phase 2 |

@@ -83,15 +83,15 @@ type Destination = 'downloads' | 'picker';
       display: flex; gap: 12px; align-items: center; padding: 10px 12px;
       border: 1px solid #e0e0e0; border-radius: 10px;
     }
-    label:has(input:checked) { border-color: #1e88e5; background: #e3f2fd; }
+    label:has(input:checked) { border-color: #B8505E; background: #FBEAEC; }
     label span { display: flex; flex-direction: column; min-width: 0; }
     small { color: #757575; font-size: 12px; overflow-wrap: anywhere; }
-    input { width: 18px; height: 18px; accent-color: #1e88e5; flex: none; }
+    input { width: 18px; height: 18px; accent-color: #B8505E; flex: none; }
     .error { margin: 12px 0 0; color: #c62828; font-size: 14px; }
     .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
     .actions button { border: 0; border-radius: 20px; padding: 10px 18px; font-size: 15px; font-weight: 600; }
-    .secondary { background: transparent; color: #1e88e5; }
-    .primary { background: #1e88e5; color: #fff; }
+    .secondary { background: transparent; color: #B8505E; }
+    .primary { background: #B8505E; color: #fff; }
     .toast {
       position: absolute; z-index: 15; left: 12px; right: 12px;
       top: calc(env(safe-area-inset-top) + 100px);
