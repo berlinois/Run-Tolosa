@@ -20,6 +20,8 @@ de serveur, pas de compte, pas d'abonnement. **Coût : 0 €.**
 | **Mises à jour en un tap** | Via Obtainium, à chaque Release produite par la CI | ✅ |
 | **Rues parcourues** | Les tronçons OSM de la commune de Toulouse validés par tes marches (au moins 60 % du tronçon parcouru) sont tracés en **doré épais**. Les rues jamais parcourues n'ont pas de trait, et la trace GPS des marches terminées n'est pas affichée. Bords de Garonne et canal du Midi compris | ✅ |
 | **Total parcouru** | Dans la légende : km de rues validées et nombre de tronçons | ✅ |
+| **Stats par quartier** | % de rues parcourues pour chaque quartier de Toulouse, en plus du % global | 💡 Idée |
+| **Carte interactive des quartiers** | Un tap sur un quartier zoome dessus et affiche ses rues faites et pas faites | 💡 Idée |
 | **Parcs** | Plus de 50 % des chemins d'un parc parcourus : le parc entier est validé, avec une couleur dédiée | 💡 Idée |
 | **Dernière marche, marche la plus longue** | Mises en valeur (rose ?) | 💡 Idée |
 | **Fonds de carte** | Bouton « calques » : clair, plan, sombre, Plan IGN, photo aérienne | 💡 Idée |
