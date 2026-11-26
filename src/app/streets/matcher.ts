@@ -1,0 +1,132 @@
+import type { TrackPoint } from '../tracking/model';
+import type { StreetSegment } from './streets';
+
+/**
+ * Association points GPS → tronçons de rue.
+ * Un tronçon est validé pour une marche si au moins COVERAGE_RATIO de sa
+ * longueur passe à moins de MATCH_RADIUS_M d'un point de la trace.
+ * Changer un paramètre = changer MATCHER_ID : tout est recalculé.
+ */
+export const MATCHER_ID = 'matcher-v1';
+export const MAX_POINT_ACCURACY_M = 25;
+export const MATCH_RADIUS_M = 12;
+export const COVERAGE_RATIO = 0.6;
+/** Pas d'échantillonnage le long des tronçons. */
+const SAMPLE_STEP_M = 4;
+/**
+ * Tolérance dans le sens de la rue : un point GPS ne « couvre » la rue que
+ * sur ±ALONG_TOLERANCE_M autour de sa projection (sinon le rayon de 12 m
+ * étirerait la couverture au-delà de l'endroit où l'on s'est arrêté).
+ */
+const ALONG_TOLERANCE_M = 5;
+/** Trou dans la trace au-delà duquel on n'interpole pas (signal perdu, transport…). */
+const MAX_INTERPOLATION_GAP_M = 40;
+
+const M_PER_DEG_LAT = 110_574;
+
+/** Projection locale en mètres (précise à l'échelle d'une ville). */
+class LocalProjection {
+  private readonly mPerDegLon: number;
+  constructor(lat0: number) {
+    this.mPerDegLon = 111_320 * Math.cos((lat0 * Math.PI) / 180);
+  }
+  x(lon: number): number {
+    return lon * this.mPerDegLon;
+  }
+  y(lat: number): number {
+    return lat * M_PER_DEG_LAT;
+  }
+}
+
+/** Grille de hachage des points de la trace (cellule = rayon de recherche). */
+class PointGrid {
+  private readonly cells = new Map<string, number[]>();
+  constructor(private readonly cell: number) {}
+  private key(cx: number, cy: number): string {
+    return `${cx}:${cy}`;
+  }
+  add(x: number, y: number): void {
+    const k = this.key(Math.floor(x / this.cell), Math.floor(y / this.cell));
+    const list = this.cells.get(k);
+    if (list) list.push(x, y);
+    else this.cells.set(k, [x, y]);
+  }
+  /**
+   * Existe-t-il un point de la trace à moins de `lateral` m de part et d'autre
+   * de la rue et à moins de `along` m dans son sens (direction unitaire ux, uy) ?
+   */
+  hasNear(x: number, y: number, ux: number, uy: number, lateral: number, along: number): boolean {
+    const cx = Math.floor(x / this.cell), cy = Math.floor(y / this.cell);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const pts = this.cells.get(this.key(cx + dx, cy + dy));
+        if (!pts) continue;
+        for (let i = 0; i < pts.length; i += 2) {
+          const ex = pts[i] - x, ey = pts[i + 1] - y;
+          if (Math.abs(ex * ux + ey * uy) <= along && Math.abs(ex * uy - ey * ux) <= lateral) return true;
+        }
+      }
+    }
+    return false;
+  }
+}
+
+/** Ids des tronçons validés par une marche. */
+export function matchWalk(points: readonly TrackPoint[], segments: readonly StreetSegment[]): string[] {
+  const good = points.filter((p) => p.acc <= MAX_POINT_ACCURACY_M);
+  if (good.length < 2) return [];
+
+  const proj = new LocalProjection(good[0].lat);
+  const grid = new PointGrid(MATCH_RADIUS_M);
+  let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+
+  // Trace densifiée : points intermédiaires tous les ~3 m quand le trou est raisonnable.
+  for (let i = 0; i < good.length; i++) {
+    const p = good[i];
+    const x = proj.x(p.lon), y = proj.y(p.lat);
+    grid.add(x, y);
+    minLon = Math.min(minLon, p.lon); maxLon = Math.max(maxLon, p.lon);
+    minLat = Math.min(minLat, p.lat); maxLat = Math.max(maxLat, p.lat);
+    if (i === 0) continue;
+    const q = good[i - 1];
+    const qx = proj.x(q.lon), qy = proj.y(q.lat);
+    const d = Math.hypot(x - qx, y - qy);
+    if (d > 3 && d <= MAX_INTERPOLATION_GAP_M) {
+      const n = Math.ceil(d / 3);
+      for (let k = 1; k < n; k++) grid.add(qx + ((x - qx) * k) / n, qy + ((y - qy) * k) / n);
+    }
+  }
+
+  // Marge en degrés autour de la trace pour présélectionner les tronçons.
+  const mLat = MATCH_RADIUS_M / M_PER_DEG_LAT;
+  const mLon = MATCH_RADIUS_M / (111_320 * Math.cos((good[0].lat * Math.PI) / 180));
+
+  const validated: string[] = [];
+  for (const s of segments) {
+    const [a, b, c, d] = s.bbox;
+    if (c < minLon - mLon || a > maxLon + mLon || d < minLat - mLat || b > maxLat + mLat) continue;
+    if (coveredRatio(s, proj, grid) >= COVERAGE_RATIO) validated.push(s.id);
+  }
+  return validated;
+}
+
+/** Part de la longueur du tronçon à moins de MATCH_RADIUS_M de la trace. */
+function coveredRatio(s: StreetSegment, proj: LocalProjection, grid: PointGrid): number {
+  let total = 0, covered = 0;
+  for (let i = 1; i < s.coords.length; i++) {
+    const [lon0, lat0] = s.coords[i - 1], [lon1, lat1] = s.coords[i];
+    const x0 = proj.x(lon0), y0 = proj.y(lat0), x1 = proj.x(lon1), y1 = proj.y(lat1);
+    const len = Math.hypot(x1 - x0, y1 - y0);
+    if (len === 0) continue;
+    const ux = (x1 - x0) / len, uy = (y1 - y0) / len;
+    const n = Math.max(1, Math.round(len / SAMPLE_STEP_M));
+    // Échantillons au milieu de chaque pas, chacun pèse len / n.
+    for (let k = 0; k < n; k++) {
+      const t = (k + 0.5) / n;
+      const x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t;
+      if (grid.hasNear(x, y, ux, uy, MATCH_RADIUS_M, ALONG_TOLERANCE_M)) covered += len / n;
+    }
+    total += len;
+  }
+  return total > 0 ? covered / total : 0;
+}

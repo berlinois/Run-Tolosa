@@ -1,7 +1,7 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
-import type { Feature, LineString } from 'geojson';
+import { CoverageStore } from '../streets/coverage.store';
 import type { TrackPoint, TrackingStatus, Walk } from './model';
 import { isTooShort, linesCollection, trackToLine } from './track-geo';
 import { Tracking } from './tracking.plugin';
@@ -21,10 +21,8 @@ export class TrackingStore {
   readonly error = signal<string | null>(null);
   readonly busy = signal(false);
 
-  /** Traces terminées : immuables, donc mises en cache par id. */
-  private readonly finishedLines = signal<Map<string, Feature<LineString> | null>>(new Map());
+  private readonly coverage = inject(CoverageStore);
 
-  readonly pastTracks = computed(() => linesCollection([...this.finishedLines().values()]));
   readonly liveLine = computed(() => linesCollection([trackToLine(this.liveTrack())]));
 
   private started = false;
@@ -49,7 +47,7 @@ export class TrackingStore {
       this.walks.set(walks);
       // Points reçus pendant que l'écran était éteint : on relit le fichier.
       this.liveTrack.set(status.walk ? (await Tracking.getTrack({ walkId: status.walk.id })).points : []);
-      await this.loadFinishedTracks(walks.filter((w) => w.status !== 'recording'));
+      void this.coverage.sync(walks);
     } catch (e) {
       this.error.set(`Lecture des marches impossible : ${(e as Error).message}`);
     }
@@ -104,10 +102,8 @@ export class TrackingStore {
     this.busy.set(true);
     try {
       await Tracking.deleteWalk({ walkId: walk.id });
-      const cache = new Map(this.finishedLines());
-      cache.delete(walk.id);
-      this.finishedLines.set(cache);
       this.shortWalk.set(null);
+      await this.coverage.reset(); // elle a peut-être déjà été comptée : on recalcule
       await this.refresh();
     } catch (e) {
       this.error.set((e as Error).message);
@@ -117,15 +113,4 @@ export class TrackingStore {
     }
   }
 
-  private async loadFinishedTracks(walks: Walk[]): Promise<void> {
-    const cache = new Map(this.finishedLines());
-    let changed = false;
-    for (const walk of walks) {
-      if (cache.has(walk.id)) continue;
-      const { points } = await Tracking.getTrack({ walkId: walk.id });
-      cache.set(walk.id, trackToLine(points, { walkId: walk.id }));
-      changed = true;
-    }
-    if (changed) this.finishedLines.set(cache);
-  }
 }

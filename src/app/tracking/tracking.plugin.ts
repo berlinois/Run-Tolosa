@@ -16,6 +16,7 @@ export interface TrackingPlugin {
   listWalks(): Promise<{ walks: Walk[] }>;
   getTrack(options: { walkId: string }): Promise<{ points: TrackPoint[] }>;
   deleteWalk(options: { walkId: string }): Promise<void>;
+  markProcessed(options: { walkId: string; processedWith: string }): Promise<void>;
   addListener(event: 'point', cb: (e: { point: TrackPoint; walk: Walk }) => void): Promise<PluginListenerHandle>;
   addListener(event: 'state', cb: (s: TrackingStatus) => void): Promise<PluginListenerHandle>;
 }

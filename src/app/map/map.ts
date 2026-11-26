@@ -12,14 +12,16 @@ import {
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { Map as MlMap, type GeoJSONSource } from 'maplibre-gl';
-import { COVERAGE_LEVELS, coverageColorExpression } from '../core/coverage-style';
-import { DEMO_STREETS } from '../core/demo-streets';
 import { LocationService } from '../core/location.service';
+import { CoverageStore } from '../streets/coverage.store';
 import { TrackingStore } from '../tracking/tracking.store';
 
 const TOULOUSE_CENTER: [number, number] = [1.4442, 43.6045];
-/** Fond de carte gratuit, sans clé. Phase 2 : PMTiles de Toulouse embarqué (hors ligne). */
+/** Fond de carte gratuit, sans clé. Phase 3 : PMTiles de Toulouse embarqué (hors ligne). */
 const BASEMAP_STYLE = 'https://tiles.openfreemap.org/styles/positron';
+const STREET_COLOR = '#F2B705';
+const STREET_CASING = '#9A6B00';
+const LIVE_COLOR = '#1E88E5';
 
 @Component({
   selector: 'app-map',
@@ -28,8 +30,13 @@ const BASEMAP_STYLE = 'https://tiles.openfreemap.org/styles/positron';
     <div #mapEl class="map"></div>
 
     <aside class="legend">
-      @for (level of levels; track level.minPassages) {
-        <div><span class="swatch" [style.background]="level.color"></span>{{ level.label }}</div>
+      <div><span class="swatch street"></span>Rue parcourue</div>
+      <div><span class="swatch live"></span>Marche en cours</div>
+      @if (coverage.stats().segments > 0) {
+        <div class="stats">{{ km() }} de rues · {{ coverage.stats().segments }} tronçons</div>
+      }
+      @if (coverage.error(); as err) {
+        <div class="err">{{ err }}</div>
       }
       @if (version(); as v) {
         <div class="version">v{{ v }}</div>
@@ -53,7 +60,11 @@ const BASEMAP_STYLE = 'https://tiles.openfreemap.org/styles/positron';
       box-shadow: 0 1px 4px #0003;
     }
     .version { margin-top: 4px; color: #757575; font-size: 11px; }
-    .swatch { display: inline-block; width: 18px; height: 4px; margin-right: 6px; vertical-align: middle; border-radius: 2px; }
+    .swatch { display: inline-block; width: 18px; margin-right: 6px; vertical-align: middle; border-radius: 3px; }
+    .swatch.street { height: 6px; background: #F2B705; box-shadow: 0 0 0 1px #9A6B00; }
+    .swatch.live { height: 3px; background: #1E88E5; }
+    .stats { margin-top: 4px; font-weight: 600; color: #6d4c00; }
+    .err { margin-top: 4px; color: #c62828; max-width: 220px; }
     .locate {
       position: absolute; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 20px);
       width: 56px; height: 56px; border: 0; border-radius: 50%; font-size: 22px;
@@ -72,7 +83,7 @@ export class MapView implements OnDestroy {
   private map?: MlMap;
   private readonly mapLoaded = signal(false);
 
-  protected readonly levels = COVERAGE_LEVELS;
+  protected readonly coverage = inject(CoverageStore);
   protected readonly locating = signal(false);
   protected readonly status = signal<string | null>(null);
   protected readonly version = signal<string | null>(null);
@@ -84,10 +95,10 @@ export class MapView implements OnDestroy {
       void App.getInfo().then((info) => this.version.set(info.version));
     }
 
-    // Traces brutes : marches terminées (violet) et marche en cours (rouge).
+    // Rues validées (doré épais) et marche en cours (bleu fin).
     effect(() => {
       if (!this.mapLoaded()) return;
-      (this.map?.getSource('walks') as GeoJSONSource | undefined)?.setData(this.tracking.pastTracks());
+      (this.map?.getSource('streets') as GeoJSONSource | undefined)?.setData(this.coverage.coveredLines());
     });
     effect(() => {
       if (!this.mapLoaded()) return;
@@ -106,28 +117,24 @@ export class MapView implements OnDestroy {
     this.map = map;
 
     map.on('load', () => {
-      // Calque des rues, colorié selon `passages` (data-driven styling).
-      map.addSource('streets', { type: 'geojson', data: DEMO_STREETS });
+      const empty = { type: 'FeatureCollection' as const, features: [] };
+      // Rues validées : liseré foncé + trait doré épais.
+      map.addSource('streets', { type: 'geojson', data: empty });
+      const width = (base: number) =>
+        ['interpolate', ['exponential', 1.6], ['zoom'], 12, base * 0.4, 15, base, 18, base * 2.6] as never;
       map.addLayer({
-        id: 'streets-coverage',
+        id: 'streets-casing',
         type: 'line',
         source: 'streets',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: {
-          'line-color': coverageColorExpression(),
-          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2, 17, 8],
-          'line-opacity': 0.85,
-        },
+        paint: { 'line-color': STREET_CASING, 'line-width': width(8), 'line-opacity': 0.5 },
       });
-
-      const empty = { type: 'FeatureCollection' as const, features: [] };
-      map.addSource('walks', { type: 'geojson', data: empty });
       map.addLayer({
-        id: 'walks',
+        id: 'streets',
         type: 'line',
-        source: 'walks',
+        source: 'streets',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#7e57c2', 'line-width': 3, 'line-opacity': 0.6 },
+        paint: { 'line-color': STREET_COLOR, 'line-width': width(6) },
       });
       map.addSource('live', { type: 'geojson', data: empty });
       map.addLayer({
@@ -135,7 +142,7 @@ export class MapView implements OnDestroy {
         type: 'line',
         source: 'live',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#e53935', 'line-width': 4 },
+        paint: { 'line-color': LIVE_COLOR, 'line-width': 3.5 },
       });
 
       map.addSource('me', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
@@ -152,6 +159,10 @@ export class MapView implements OnDestroy {
       });
       this.mapLoaded.set(true);
     });
+  }
+
+  protected km(): string {
+    return `${this.coverage.stats().km.toFixed(1).replace('.', ',')} km`;
   }
 
   protected async locate(): Promise<void> {

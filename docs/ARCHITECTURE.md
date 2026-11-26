@@ -80,8 +80,11 @@ point. Il est écrit et flushé dès réception, puis jamais modifié.
 | `acc` | `8` | Précision (m). Au-delà de 25 m, le point est ignoré pour la distance, l'affichage et l'association aux rues |
 | `alt`, `spd` | `146.2`, `1.38` | Altitude (m) et vitesse (m/s), si disponibles |
 
-**`SegmentCoverage`** : la couverture, dans `coverage.json` (Phase 2). Ce fichier
-est **dérivé** des traces.
+**`SegmentCoverage`** : la couverture, dans `coverage.json`. Ce fichier est
+**dérivé** des traces. Il contient `processedWith` (algo + version des rues),
+`walkIds` (les marches déjà comptées) et `segments` (`{ segmentId: SegmentCoverage }`).
+Si l'algo ou les rues changent, il est recalculé depuis les traces. Il est aussi
+recalculé quand une marche est supprimée.
 
 | Champ | Exemple | Rôle |
 |---|---|---|
@@ -99,8 +102,7 @@ une marche si au moins 60 % de sa longueur est couverte.
 files/
   walks/<id>.json     Walk
   walks/<id>.jsonl    TrackPoints (bruts, immuables)
-  coverage.json       { segmentId: SegmentCoverage }   (Phase 2)
-  meta.json           version du schéma, version OSM, seuils (Phase 2)
+  coverage.json       couverture dérivée (voir ci-dessus)
 ```
 
 Une heure de marche fait environ 1 800 points, soit environ 100 Ko. Une marche
@@ -109,28 +111,42 @@ le dossier.
 
 ## L'association des points GPS aux rues
 
-C'est la partie la plus délicate, en Phase 2.
-1. Au démarrage : on charge les tronçons dans un index spatial (`rbush`).
-2. Pour chaque point GPS dont la précision est inférieure à 25 m : on cherche les
-   tronçons à moins d'environ 15 m (`turf` pour la distance point-ligne).
-3. Un tronçon est **validé pour une marche** si au moins 60 % de sa longueur a
-   été couverte par des points proches. Ça évite de compter une rue que tu as
-   seulement croisée.
-4. On ajoute 1 à `passages` pour chaque tronçon validé, une fois par marche.
+Le code est dans `src/app/streets/matcher.ts`, avec ses tests. Les seuils ont été
+réglés sur une vraie marche : un point par seconde, précision médiane de 4,5 m.
 
-Les seuils sont des paramètres à ajuster sur tes vraies traces.
+1. **Le référentiel** : `scripts/extract-streets.mjs` interroge Overpass sur la
+   commune de Toulouse (INSEE 31555).
+   - **Gardé** : rues, avenues, voies piétonnes, chemins, pistes cyclables,
+     escaliers et chemins de halage (bords de Garonne, canal du Midi).
+   - **Exclu** : autoroutes, voies rapides, accès de parking et voies de
+     service, accès privés, trottoirs et passages piétons.
+   - Chaque voie est coupée aux intersections, et le résultat va dans
+     `public/streets/toulouse.json`.
+2. **Les points de la trace** : on garde les points dont la précision est
+   inférieure ou égale à 25 m, et on comble les trous de moins de 40 m (un point
+   tous les 3 m).
+3. **La couverture d'un tronçon** : on l'échantillonne tous les 4 m. Un
+   échantillon est couvert si un point de la trace se trouve à moins de **12 m**
+   sur le côté et à moins de **5 m** dans le sens de la rue. Grâce à cette
+   tolérance de 5 m, une rue simplement croisée, ou faite à moitié, n'est pas
+   « étirée » par le rayon.
+4. **La validation** : un tronçon est validé pour une marche si au moins **60 %**
+   de sa longueur est couverte. Chaque marche qui valide le tronçon ajoute 1 à
+   `passages`.
+
+Si on change un seuil, on change `MATCHER_ID` : tout est alors recalculé
+automatiquement à partir des traces brutes.
 
 ## Structure du code
 
 ```
 src/app/
   core/
-    coverage-style.ts      palette et expression MapLibre        ✅ Phase 0
-    demo-streets.ts        3 rues de démo                        ✅ Phase 0 (supprimé en Phase 2)
     location.service.ts    position ponctuelle                   ✅ Phase 0
-    streets.repository.ts  chargement du GeoJSON + index         ⏳ Phase 2
-    matching.service.ts    points → tronçons                     ⏳ Phase 2
-    coverage.store.ts      lecture/écriture coverage.json        ⏳ Phase 2
+  streets/
+    streets.ts             format du référentiel des tronçons    ✅ Phase 2
+    matcher.ts             points GPS → tronçons validés         ✅ Phase 2
+    coverage.store.ts      coverage.json, rues dorées, stats     ✅ Phase 2
   map/map.ts               carte MapLibre + calques              ✅ Phase 0-1
   tracking/
     model.ts               Walk, TrackPoint                      ✅ Phase 1
@@ -147,7 +163,8 @@ android/app/src/main/java/fr/runtolosa/app/tracking/
   TrackingService.java     foreground service GPS                ✅ Phase 1
   WalkStore.java           fichiers walks/*.json(l)              ✅ Phase 1
 scripts/
-  extract-streets.mjs      OSM (Overpass) → tronçons GeoJSON     ⏳ Phase 2
+  extract-streets.mjs      OSM (Overpass) → tronçons             ✅ Phase 2
+  generate-icons.mjs       design/icon.svg → icônes Android      ✅
 ```
 
 ## Feuille de route
@@ -155,8 +172,8 @@ scripts/
 | Phase | Contenu | « C'est fini quand… » |
 |---|---|---|
 | **0. Pipeline** ✅ | Squelette Angular + Capacitor + MapLibre, 3 rues de démo coloriées, bouton « me localiser », CI qui produit l'APK et la Release | L'APK de la Release s'installe sur le téléphone, la carte s'affiche, le point GPS apparaît |
-| **1. Enregistrer** 🧪 | Plugin Java : démarrer/arrêter une marche, foreground service, écriture `.jsonl`, liste des marches, tracé brut sur la carte | Une marche de 30 min poche, écran éteint, donne une trace complète sans trou |
-| **2. Rues** | Script d'extraction OSM, association des points aux rues, `coverage.json`, coloriage réel | Les rues réellement parcourues sont vertes, les autres grises |
+| **1. Enregistrer** ✅ | Plugin Java : démarrer/arrêter une marche, foreground service, écriture `.jsonl`, liste des marches, tracé brut sur la carte | Une marche de 30 min poche, écran éteint, donne une trace complète sans trou |
+| **2. Rues** 🧪 | Script d'extraction OSM, association des points aux rues, `coverage.json`, coloriage réel | Les rues réellement parcourues sont vertes, les autres grises |
 | **3. Hors ligne** | Fond de carte PMTiles embarqué | L'appli marche en mode avion |
 | **4. Plaisir** | Stats (% de Toulouse, km), couleurs par ancienneté, filtres par quartier, export et sauvegarde | — |
 

@@ -12,14 +12,17 @@ de serveur, pas de compte, pas d'abonnement. **Coût : 0 €.**
 | **Me localiser** | Bouton rond 📍 : position actuelle et précision du GPS | ✅ |
 | **Enregistrer une marche** | Bouton « Démarrer / Arrêter ». Le GPS est lu toutes les 2 s, **même écran éteint**, avec une notification qui affiche la distance et un bouton Arrêter | ✅ |
 | **Marche trop courte** | À l'arrêt d'une marche de moins de 5 min, une popup « Marche trop courte » s'affiche. **Supprimer** (rouge) efface définitivement la marche, **Sauvegarder quand même** la garde | ✅ |
-| **Suivi en direct** | Chrono, distance et nombre de points. Trace en cours en rouge | ✅ |
-| **Historique des traces** | Toutes les marches terminées sont affichées en violet sur la carte | ✅ |
+| **Suivi en direct** | Chrono, distance et nombre de points. Trace en cours en **bleu** | ✅ |
 | **Données brutes conservées** | Chaque point GPS est écrit sur le disque dès sa réception et n'est jamais modifié | ✅ |
 | **Extraire mes marches** | Bouton rond ⤓, puis une popup de confirmation. Le zip des traces brutes va dans **Téléchargements** par défaut, ou à un autre emplacement au choix | ✅ |
 | **Logo** | Le clocher de Saint-Sernin au bout d'une marche dorée, avec la Garonne, sur fond rose brique. Icône Android adaptative et ronde, écran de démarrage. Source : `design/icon.svg`, régénération : `node scripts/generate-icons.mjs` | ✅ |
 | **Version affichée** | En bas de la légende | ✅ |
 | **Mises à jour en un tap** | Via Obtainium, à chaque Release produite par la CI | ✅ |
-| **Rues coloriées** | Tronçons OSM de Toulouse, coloriés selon le nombre de passages (≥ 60 % du tronçon parcouru) | ⏳ Phase 2 |
+| **Rues parcourues** | Les tronçons OSM de la commune de Toulouse validés par tes marches (au moins 60 % du tronçon parcouru) sont tracés en **doré épais**. Les rues jamais parcourues n'ont pas de trait, et la trace GPS des marches terminées n'est pas affichée. Bords de Garonne et canal du Midi compris | ✅ |
+| **Total parcouru** | Dans la légende : km de rues validées et nombre de tronçons | ✅ |
+| **Parcs** | Plus de 50 % des chemins d'un parc parcourus : le parc entier est validé, avec une couleur dédiée | 💡 Idée |
+| **Dernière marche, marche la plus longue** | Mises en valeur (rose ?) | 💡 Idée |
+| **Fonds de carte** | Bouton « calques » : clair, plan, sombre, Plan IGN, photo aérienne | 💡 Idée |
 | **Carte hors ligne** | Fond PMTiles de Toulouse embarqué | ⏳ Phase 3 |
 | **Stats** | % de Toulouse parcouru, km, quartiers, couleurs selon l'ancienneté | ⏳ Phase 4 |
 

@@ -121,6 +121,30 @@ public class TrackingPlugin extends Plugin {
         }, "TrackingRead").start();
     }
 
+    /** Marque une marche comme traitée par l'association aux rues (Walk.processedWith). */
+    @PluginMethod
+    public void markProcessed(PluginCall call) {
+        String walkId = call.getString("walkId");
+        String processedWith = call.getString("processedWith");
+        if (walkId == null || !walkId.matches("[0-9T-]+") || processedWith == null) {
+            call.reject("Paramètres invalides");
+            return;
+        }
+        JSONObject meta = store.readMeta(walkId);
+        if (meta == null || WalkStore.STATUS_RECORDING.equals(meta.optString("status"))) {
+            call.reject("Marche introuvable ou en cours");
+            return;
+        }
+        try {
+            meta.put("status", "processed");
+            meta.put("processedWith", processedWith);
+            store.writeMeta(meta);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Mise à jour impossible : " + e.getMessage(), e);
+        }
+    }
+
     /** Suppression définitive, demandée par l'utilisateur (marche trop courte). */
     @PluginMethod
     public void deleteWalk(PluginCall call) {
