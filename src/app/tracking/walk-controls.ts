@@ -28,6 +28,25 @@ import { TrackingStore } from './tracking.store';
           <div class="error">{{ err }}</div>
         }
       </div>
+
+      @if (store.shortWalk(); as walk) {
+        <div class="backdrop"></div>
+        <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="short-title" aria-describedby="short-desc">
+          <h2 id="short-title">Marche trop courte</h2>
+          <p id="short-desc">
+            Cette marche n'a duré que <strong>{{ duration(walk) }}</strong> ({{ distance(walk.distanceM) }}).
+            Confirmez-vous sa suppression ? Elle sera effacée définitivement.
+          </p>
+          <div class="actions">
+            <button type="button" class="keep" (click)="store.keepShortWalk()" [disabled]="store.busy()">
+              Sauvegarder quand même
+            </button>
+            <button type="button" class="delete" (click)="store.deleteShortWalk()" [disabled]="store.busy()">
+              Supprimer
+            </button>
+          </div>
+        </div>
+      }
     }
   `,
   styles: `
@@ -47,6 +66,18 @@ import { TrackingStore } from './tracking.store';
     @keyframes blink { 50% { opacity: .3; } }
     .muted { color: #757575; }
     .small { font-size: 12px; padding-left: 8px; text-shadow: 0 0 3px #fff; }
+    .backdrop { position: fixed; inset: 0; z-index: 20; background: #0007; }
+    .dialog {
+      position: fixed; z-index: 21; left: 16px; right: 16px; top: 50%; transform: translateY(-50%);
+      max-width: 420px; margin: 0 auto; padding: 20px; border-radius: 16px;
+      background: #fff; color: #212121; box-shadow: 0 8px 24px #0005;
+    }
+    .dialog h2 { margin: 0 0 8px; font-size: 18px; }
+    .dialog p { margin: 0; color: #424242; font-size: 15px; line-height: 1.4; }
+    .actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    .actions button { padding: 10px 16px; font-size: 15px; box-shadow: none; }
+    .keep { background: transparent; color: #1e88e5; }
+    .delete { background: #c62828; }
     .error { padding: 8px 10px; background: #000c; color: #fff; border-radius: 8px; font-size: 13px; }
   `,
 })
@@ -60,6 +91,10 @@ export class WalkControls {
   });
 
   protected readonly distance = formatDistance;
+
+  protected duration(walk: { startedAt: number; endedAt: number | null }): string {
+    return formatDuration((walk.endedAt ?? Date.now()) - walk.startedAt);
+  }
 
   constructor() {
     const timer = setInterval(() => this.now.set(Date.now()), 1000);

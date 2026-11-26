@@ -1,5 +1,5 @@
 import type { TrackPoint } from './model';
-import { formatDistance, formatDuration, linesCollection, trackToLine } from './track-geo';
+import { formatDistance, formatDuration, isTooShort, linesCollection, trackToLine } from './track-geo';
 
 const pt = (lon: number, lat: number, acc = 5): TrackPoint => ({ t: 0, lat, lon, acc });
 
@@ -27,5 +27,10 @@ describe('track-geo', () => {
     expect(formatDistance(5240)).toBe('5,24 km');
     expect(formatDuration(65_000)).toBe('01:05');
     expect(formatDuration(3_725_000)).toBe('1:02:05');
+  });
+
+  it('considère trop courte une marche de moins de 5 minutes', () => {
+    expect(isTooShort(0, 4 * 60_000 + 59_000)).toBe(true);
+    expect(isTooShort(0, 5 * 60_000)).toBe(false);
   });
 });

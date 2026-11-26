@@ -121,6 +121,26 @@ public class TrackingPlugin extends Plugin {
         }, "TrackingRead").start();
     }
 
+    /** Suppression définitive, demandée par l'utilisateur (marche trop courte). */
+    @PluginMethod
+    public void deleteWalk(PluginCall call) {
+        String walkId = call.getString("walkId");
+        if (walkId == null || !walkId.matches("[0-9T-]+")) {
+            call.reject("walkId invalide");
+            return;
+        }
+        JSONObject current = TrackingService.currentMeta();
+        if (current != null && walkId.equals(current.optString("id"))) {
+            call.reject("Impossible de supprimer la marche en cours d'enregistrement");
+            return;
+        }
+        if (store.delete(walkId)) {
+            call.resolve();
+        } else {
+            call.reject("Suppression impossible");
+        }
+    }
+
     private JSObject status() {
         JSObject ret = new JSObject();
         JSONObject meta = TrackingService.currentMeta();

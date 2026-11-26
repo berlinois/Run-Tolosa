@@ -86,6 +86,13 @@ public final class WalkStore {
         }
     }
 
+    /** Suppression définitive d'une marche (métadonnées + points). */
+    public boolean delete(String walkId) {
+        boolean meta = metaFile(walkId).delete();
+        boolean track = !trackFile(walkId).exists() || trackFile(walkId).delete();
+        return meta && track;
+    }
+
     /** Toutes les marches, de la plus récente à la plus ancienne. */
     public List<JSONObject> listMetas() {
         List<JSONObject> metas = new ArrayList<>();

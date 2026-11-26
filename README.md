@@ -11,6 +11,7 @@ de serveur, pas de compte, pas d'abonnement. **Coût : 0 €.**
 | **Carte de Toulouse** | Fond de carte OpenFreeMap affiché avec MapLibre, sans clé d'API | ✅ |
 | **Me localiser** | Bouton rond 📍 : position actuelle et précision du GPS | ✅ |
 | **Enregistrer une marche** | Bouton « Démarrer / Arrêter ». Le GPS est lu toutes les 2 s, **même écran éteint**, avec une notification qui affiche la distance et un bouton Arrêter | ✅ |
+| **Marche trop courte** | À l'arrêt d'une marche de moins de 5 min, une popup « Marche trop courte » s'affiche. **Supprimer** (rouge) efface définitivement la marche, **Sauvegarder quand même** la garde | ✅ |
 | **Suivi en direct** | Chrono, distance et nombre de points. Trace en cours en rouge | ✅ |
 | **Historique des traces** | Toutes les marches terminées sont affichées en violet sur la carte | ✅ |
 | **Données brutes conservées** | Chaque point GPS est écrit sur le disque dès sa réception et n'est jamais modifié | ✅ |

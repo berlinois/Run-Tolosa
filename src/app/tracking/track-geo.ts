@@ -34,3 +34,10 @@ export function formatDuration(ms: number): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
+
+/** En dessous, on propose de supprimer la marche à l'arrêt. */
+export const MIN_WALK_DURATION_MS = 5 * 60 * 1000;
+
+export function isTooShort(startedAt: number, endedAt: number): boolean {
+  return endedAt - startedAt < MIN_WALK_DURATION_MS;
+}
