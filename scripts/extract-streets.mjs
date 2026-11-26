@@ -40,7 +40,12 @@ function haversine(a, b) {
 
 async function overpass(query) {
   for (let attempt = 1; attempt <= 3; attempt++) {
-    const res = await fetch(OVERPASS, { method: 'POST', body: new URLSearchParams({ data: query }) });
+    const res = await fetch(OVERPASS, {
+      method: 'POST',
+      // Overpass rejette (HTTP 406) les clients sans User-Agent explicite.
+      headers: { 'User-Agent': 'run-tolosa-street-extractor/1.0 (personal, non-commercial)', Accept: 'application/json' },
+      body: new URLSearchParams({ data: query }),
+    });
     if (res.ok) return res.json();
     console.warn(`Overpass HTTP ${res.status}, tentative ${attempt}/3`);
     await new Promise((r) => setTimeout(r, 30_000 * attempt));
