@@ -102,6 +102,8 @@ mkdirSync('public/streets', { recursive: true });
 writeFileSync('public/streets/iris.geojson', JSON.stringify({
   type: 'FeatureCollection',
   attribution: 'Contours IRIS © INSEE / IGN (Licence Ouverte) ; noms de quartiers © OpenStreetMap contributors (ODbL)',
+  // Points des quartiers OSM (place=suburb|quarter|neighbourhood), pour nommer les IRIS.
+  places: places.map((p) => ({ ...p, lon: Math.round(p.lon * 1e6) / 1e6, lat: Math.round(p.lat * 1e6) / 1e6 })),
   features: out,
 }));
 console.log(`\n${out.length} IRIS écrits :`);
