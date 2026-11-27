@@ -80,25 +80,17 @@ point. Il est écrit et flushé dès réception, puis jamais modifié.
 | `acc` | `8` | Précision (m). Au-delà de 25 m, le point est ignoré pour la distance, l'affichage et l'association aux rues |
 | `alt`, `spd` | `146.2`, `1.38` | Altitude (m) et vitesse (m/s), si disponibles |
 
-**`SegmentCoverage`** : la couverture, dans `coverage.json`. Ce fichier est
-**dérivé** des traces. Il contient `processedWith` (algo + version des rues),
-`walkIds` (les marches déjà comptées) et `segments` (`{ segmentId: SegmentCoverage }`).
-Si l'algo ou les rues changent, il est recalculé depuis les traces. Il est aussi
-recalculé quand une marche est supprimée.
+**`coverage.json`** : la couverture **brute**, **dérivée** des traces et
+recalculable à tout moment. Il contient :
+- `processedWith` : la version de l'algo et des rues ;
+- `walkIds` : les marches déjà comptées ;
+- `walkDates` : la date de chaque marche ;
+- `segments` : `{ idTronçon: { idMarche: [part parcourue, masque] } }`. Le
+  masque note les mètres parcourus, un caractère tous les ~4 m.
 
-| Champ | Exemple | Rôle |
-|---|---|---|
-| `segmentId` | `"w12345:3"` | Lien vers le tronçon |
-| `status` | `"gold"` / `"pink"` | Doré (validé) ou rose (parcouru), selon la meilleure marche : c'est la couleur |
-| `best`, `bestWalkId` | `0.94`, `"2026-11-27T07-12-05"` | Meilleure couverture en une marche, et cette marche |
-| `mask` | `"111111000"` | Mètres parcourus lors de la meilleure marche (un caractère tous les ~4 m), pour dessiner les parties faites |
-| `walks` | `{ "2026-11-27T07-12-05": 0.94 }` | Couverture du tronçon par chaque marche, pour les stats d'une rue |
-| `passages` | `4` | Nombre de marches qui ont fait au moins 30 % du tronçon |
-| `firstAt` / `lastAt` | ms epoch | Couleur selon l'ancienneté, date de découverte |
-| `lastWalkId` | `"2026-11-27T07-12-05"` | Dernière marche |
-
-Un tronçon sans entrée n'a jamais été parcouru. Un tronçon est **validé** pour
-une marche si au moins 60 % de sa longueur est couverte.
+Le statut et les stats de chaque rue et de chaque quartier sont **calculés à
+la volée** à partir de ce fichier. Si l'algo ou les rues changent, ou si une
+marche est supprimée, tout est recalculé depuis les traces.
 
 ### Sur le disque
 
@@ -106,7 +98,7 @@ une marche si au moins 60 % de sa longueur est couverte.
 files/
   walks/<id>.json     Walk
   walks/<id>.jsonl    TrackPoints (bruts, immuables)
-  coverage.json       couverture dérivée (voir ci-dessus)
+  coverage.json       couverture brute par tronçon et par marche (voir ci-dessus)
 ```
 
 Une heure de marche fait environ 1 800 points, soit environ 100 Ko. Une marche
@@ -143,17 +135,20 @@ réglés sur une vraie marche : un point par seconde, précision médiane de 4,5
    sur le côté et à moins de **5 m** dans le sens de la rue. Grâce à cette
    tolérance de 5 m, une rue simplement croisée, ou faite à moitié, n'est pas
    « étirée » par le rayon.
-4. **Le statut**, calculé sur **la meilleure marche**, sans cumul entre
-   marches :
-   - **doré** (rue validée) : sur une même marche, la partie non parcourue
-     fait au plus **10 m + 3 % de la longueur**, avec au moins 50 % parcourus.
-     Ça laisse 13 m sur 100 m et 40 m sur 1 km ;
-   - **rose** (rue parcourue) : au moins **30 %** parcourus sur une marche ;
+4. **La rue** : les tronçons voisins de même nom forment une rue
+   (`street-index.ts`). Deux rues homonymes non reliées restent distinctes,
+   et un chemin sans nom est sa propre rue.
+5. **Le statut**, calculé sur **la rue entière et la meilleure marche**, sans
+   cumul entre marches (`street-coverage.ts`) :
+   - **doré** (rue validée) : sur une même marche, la partie non parcourue de
+     la rue fait au plus **10 m + 3 % de sa longueur**, avec au moins 50 %
+     parcourus ;
+   - **rose** (rue parcourue) : au moins **30 %** de la rue, **ou au moins
+     300 m**, sur une marche. Le plancher de 300 m sert aux longues avenues ;
    - sinon, pas de statut.
 
-   `passages` compte les marches qui ont fait au moins 30 % du tronçon.
-   `best` et `bestWalkId` gardent la meilleure couverture et la marche
-   correspondante.
+   Tous les tronçons d'une rue prennent sa couleur. Un passage, c'est une
+   marche qui atteint ce seuil du rose sur la rue.
 
 Si on change un seuil, on change `MATCHER_ID` : tout est alors recalculé
 automatiquement à partir des traces brutes.
@@ -168,6 +163,8 @@ src/app/
     streets.ts             format du référentiel des tronçons    ✅ Phase 2
     matcher.ts             points GPS → tronçons validés         ✅ Phase 2
     coverage.store.ts      coverage.json, rues dorées, stats     ✅ Phase 2
+    street-index.ts        tronçons → rues (même nom, reliés)    ✅
+    street-coverage.ts     statut et stats par rue               ✅
     street-selection.ts    rue entière, stats, parties faites    ✅
     street-card.ts         carte « détail d'une rue »            ✅
     district-stats.ts      stats d'un quartier                   ✅

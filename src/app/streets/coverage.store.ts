@@ -3,82 +3,72 @@ import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import type { FeatureCollection, LineString } from 'geojson';
 import type { Walk } from '../tracking/model';
 import { Tracking } from '../tracking/tracking.plugin';
-import { MATCHER_ID, PINK_MIN_RATIO, matchWalk, statusFor, type StreetStatus } from './matcher';
+import { MATCHER_ID, matchWalk } from './matcher';
+import { computeStreetCoverage, type RawCoverage, type StreetCoverage } from './street-coverage';
+import { buildStreetIndex, type StreetIndex } from './street-index';
 import { parseStreets, type Streets, type StreetsFile } from './streets';
 
-export interface SegmentCoverage {
-  /** Statut selon la meilleure marche. */
-  status: StreetStatus;
-  /** Meilleure couverture atteinte en une seule marche (0 à 1). */
-  best: number;
-  bestWalkId: string;
-  /** Mètres parcourus lors de la meilleure marche (voir matcher.coveredParts). */
-  mask: string;
-  /** Couverture par marche (marches ayant fait au moins 30 % du tronçon). */
-  walks: Record<string, number>;
-  /** Marches ayant parcouru au moins 30 % du tronçon. */
-  passages: number;
-  firstAt: number;
-  lastAt: number;
-  lastWalkId: string;
-}
-
 /** coverage.json : données DÉRIVÉES des traces, recalculables à tout moment. */
-interface CoverageFile {
+interface CoverageFile extends RawCoverage {
   /** Algo + version des rues : s'il change, tout est recalculé depuis les traces. */
   processedWith: string;
   /** Marches déjà comptées (source de vérité pour ne pas compter deux fois). */
   walkIds: string[];
-  segments: Record<string, SegmentCoverage>;
 }
 
 const COVERAGE_PATH = 'coverage.json';
 
+/** Tout ce qu'il faut pour afficher et interroger la couverture. */
+export interface CoverageContext {
+  streets: Streets;
+  index: StreetIndex;
+  raw: RawCoverage;
+  /** Couverture par rue (indice de rue → couverture). */
+  byStreet: Map<number, StreetCoverage>;
+}
+
 @Injectable({ providedIn: 'root' })
 export class CoverageStore {
-  private streets?: Promise<Streets>;
+  private streetsPromise?: Promise<Streets>;
+  private readonly streets = signal<Streets | null>(null);
   private readonly file = signal<CoverageFile | null>(null);
-  private segmentsRef?: Streets;
   private running: Promise<void> = Promise.resolve();
 
   readonly error = signal<string | null>(null);
 
-  /** Tronçons validés, à dessiner en doré. */
+  private readonly index = computed(() => {
+    const streets = this.streets();
+    return streets ? buildStreetIndex(streets) : null;
+  });
+
+  /** Couverture complète, recalculée quand les marches ou les rues changent. */
+  readonly context = computed<CoverageContext | null>(() => {
+    const streets = this.streets(), index = this.index(), raw = this.file();
+    if (!streets || !index || !raw) return null;
+    return { streets, index, raw, byStreet: computeStreetCoverage(raw, index, streets) };
+  });
+
+  /** Tronçons des rues roses ou dorées, colorés selon le statut de LEUR RUE. */
   readonly coveredLines = computed<FeatureCollection<LineString>>(() => {
-    const f = this.file();
-    const streets = this.segmentsRef;
-    if (!f || !streets) return { type: 'FeatureCollection', features: [] };
-    return {
-      type: 'FeatureCollection',
-      features: Object.entries(f.segments).flatMap(([id, cov]) => {
-        const s = streets.byId.get(id);
-        return s
-          ? [{
-              type: 'Feature' as const,
-              properties: { id, status: cov.status, passages: cov.passages, best: cov.best },
-              geometry: { type: 'LineString' as const, coordinates: s.coords },
-            }]
-          : [];
-      }),
-    };
+    const ctx = this.context();
+    const features: FeatureCollection<LineString>['features'] = [];
+    for (const cov of ctx?.byStreet.values() ?? []) {
+      if (!cov.status) continue;
+      for (const id of ctx!.index.streets[cov.street].segmentIds) {
+        const s = ctx!.streets.byId.get(id);
+        if (s) features.push({ type: 'Feature', properties: { id, status: cov.status }, geometry: { type: 'LineString', coordinates: s.coords } });
+      }
+    }
+    return { type: 'FeatureCollection', features };
   });
 
   readonly stats = computed(() => {
-    const f = this.file();
-    const streets = this.segmentsRef;
     const out = { gold: 0, pink: 0, goldKm: 0, pinkKm: 0 };
-    if (!f || !streets) return out;
-    for (const [id, cov] of Object.entries(f.segments)) {
-      const km = (streets.byId.get(id)?.lengthM ?? 0) / 1000;
-      if (cov.status === 'gold') { out.gold++; out.goldKm += km; } else { out.pink++; out.pinkKm += km; }
+    for (const cov of this.context()?.byStreet.values() ?? []) {
+      if (cov.status === 'gold') { out.gold++; out.goldKm += cov.lengthM / 1000; }
+      else if (cov.status === 'pink') { out.pink++; out.pinkKm += cov.lengthM / 1000; }
     }
     return out;
-  });
-
-  /** Couverture brute et référentiel, pour la sélection d'une rue. */
-  readonly coverageData = computed(() => {
-    const f = this.file();
-    return f && this.segmentsRef ? { streets: this.segmentsRef, segments: f.segments } : null;
   });
 
   /** Prend en compte les marches terminées pas encore comptées (sérialisé). */
@@ -94,7 +84,7 @@ export class CoverageStore {
     const processedWith = `${MATCHER_ID}/${streets.version}`;
     let cov: CoverageFile | null = this.file() ?? (await this.readFile());
     if (!cov || cov.processedWith !== processedWith) {
-      cov = { processedWith, walkIds: [], segments: {} }; // algo ou rues changés : on repart des traces
+      cov = { processedWith, walkIds: [], walkDates: {}, segments: {} }; // algo ou rues changés : on repart des traces
     }
     this.file.set(cov);
 
@@ -106,25 +96,11 @@ export class CoverageStore {
     for (const walk of todo) {
       const { points } = await Tracking.getTrack({ walkId: walk.id });
       const at = walk.endedAt ?? walk.startedAt;
-      const segments: Record<string, SegmentCoverage> = { ...cov.segments };
+      const segments: RawCoverage['segments'] = { ...cov.segments };
       for (const { id, ratio, mask } of matchWalk(points, streets.segments)) {
-        const prev = segments[id];
-        const isBest = !prev || ratio > prev.best;
-        const best = isBest ? ratio : prev.best;
-        const passage = ratio >= PINK_MIN_RATIO ? 1 : 0;
-        segments[id] = {
-          status: statusFor(best, streets.byId.get(id)?.lengthM ?? 0) ?? 'pink',
-          best,
-          bestWalkId: isBest ? walk.id : prev.bestWalkId,
-          mask: isBest ? mask : prev.mask,
-          walks: { ...(prev?.walks ?? {}), [walk.id]: ratio },
-          passages: (prev?.passages ?? 0) + passage,
-          firstAt: Math.min(prev?.firstAt ?? at, at),
-          lastAt: Math.max(prev?.lastAt ?? at, at),
-          lastWalkId: at >= (prev?.lastAt ?? 0) ? walk.id : prev.lastWalkId,
-        };
+        segments[id] = { ...(segments[id] ?? {}), [walk.id]: [ratio, mask] };
       }
-      cov = { processedWith, walkIds: [...cov.walkIds, walk.id], segments };
+      cov = { processedWith, walkIds: [...cov.walkIds, walk.id], walkDates: { ...cov.walkDates, [walk.id]: at }, segments };
       await this.writeFile(cov);
       this.file.set(cov);
       await Tracking.markProcessed({ walkId: walk.id, processedWith }).catch(() => undefined);
@@ -139,19 +115,24 @@ export class CoverageStore {
   }
 
   private loadStreets(): Promise<Streets> {
-    this.streets ??= fetch('streets/toulouse.json')
+    this.streetsPromise ??= fetch('streets/toulouse.json')
       .then((r) => {
         if (!r.ok) throw new Error(`rues introuvables (HTTP ${r.status})`);
         return r.json() as Promise<StreetsFile>;
       })
-      .then((f) => (this.segmentsRef = parseStreets(f)));
-    return this.streets;
+      .then((f) => {
+        const streets = parseStreets(f);
+        this.streets.set(streets);
+        return streets;
+      });
+    return this.streetsPromise;
   }
 
   private async readFile(): Promise<CoverageFile | null> {
     try {
       const { data } = await Filesystem.readFile({ path: COVERAGE_PATH, directory: Directory.Data, encoding: Encoding.UTF8 });
-      return JSON.parse(data as string) as CoverageFile;
+      const f = JSON.parse(data as string) as CoverageFile;
+      return f.walkDates ? f : null; // ancien format : on recalcule
     } catch {
       return null;
     }

@@ -23,27 +23,29 @@ function walk(from: number, to: number, north = 0, acc = 5): TrackPoint[] {
 
 const statusOf = (pts: TrackPoint[], s: StreetSegment) => {
   const m = matchWalk(pts, [s])[0];
-  return m ? statusFor(m.ratio, s.lengthM) : null;
+  return m ? statusFor(m.ratio * s.lengthM, s.lengthM) : null;
 };
 
-describe('statusFor', () => {
+describe('statusFor (rue entière, meilleure marche)', () => {
   it('doré si la partie manquante tient dans 10 m + 3 % de la longueur', () => {
-    expect(statusFor(0.9, 100)).toBe('gold'); // 10 m manquants ≤ 13 m
-    expect(statusFor(0.86, 100)).toBe('pink'); // 14 m > 13 m
-    expect(statusFor(0.96, 1000)).toBe('gold'); // 40 m ≤ 40 m
-    expect(statusFor(0.95, 1000)).toBe('pink'); // 50 m > 40 m
-    expect(statusFor(0.7, 30)).toBe('gold'); // petite rue : 9 m ≤ 10,9 m
+    expect(statusFor(90, 100)).toBe('gold'); // 10 m manquants ≤ 13 m
+    expect(statusFor(86, 100)).toBe('pink'); // 14 m > 13 m
+    expect(statusFor(960, 1000)).toBe('gold'); // 40 m ≤ 40 m
+    expect(statusFor(950, 1000)).toBe('pink');
+    expect(statusFor(21, 30)).toBe('gold'); // petite rue : 9 m ≤ 10,9 m
   });
 
-  it("ne valide pas un tout petit tronçon qu'on n'a pas (assez) parcouru", () => {
+  it('rose à partir de 30 % ou de 300 m, rien en dessous', () => {
+    expect(statusFor(60, 200)).toBe('pink');
+    expect(statusFor(58, 200)).toBeNull();
+    expect(statusFor(300, 1500)).toBe('pink'); // 20 % mais 300 m
+    expect(statusFor(290, 1500)).toBeNull();
+  });
+
+  it("ne valide pas une toute petite rue qu'on n'a pas assez parcourue", () => {
     expect(statusFor(0, 4)).toBeNull();
-    expect(statusFor(0.4, 8)).toBe('pink');
-    expect(statusFor(0.6, 8)).toBe('gold');
-  });
-
-  it('rose à partir de 30 %, rien en dessous', () => {
-    expect(statusFor(0.3, 200)).toBe('pink');
-    expect(statusFor(0.29, 200)).toBeNull();
+    expect(statusFor(3.2, 8)).toBe('pink');
+    expect(statusFor(4.8, 8)).toBe('gold');
   });
 });
 
@@ -57,7 +59,7 @@ describe('matchWalk', () => {
     expect(statusOf(walk(0, 20), seg('a', 300))).toBeNull();
   });
 
-  it('ne compte pas une rue parallèle à plus de 12 m', () => {
+  it('ne touche pas une rue parallèle à plus de 12 m', () => {
     expect(matchWalk(walk(0, 100), [seg('a', 100), seg('parallele', 100, 25)]).map((m) => m.id)).toEqual(['a']);
   });
 
@@ -68,7 +70,7 @@ describe('matchWalk', () => {
       coords: [[lon, LAT0 - 40 * DLAT], [lon, LAT0 + 40 * DLAT]],
       bbox: [lon, LAT0 - 40 * DLAT, lon, LAT0 + 40 * DLAT],
     };
-    expect(matchWalk(walk(0, 100), [cross])).toEqual([]);
+    expect(statusOf(walk(0, 100), cross)).toBeNull();
   });
 
   it("ne compte pas un court tronçon d'intersection simplement traversé", () => {

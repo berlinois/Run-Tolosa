@@ -19,7 +19,7 @@ import { CoverageStore } from '../streets/coverage.store';
 import { DistrictCard } from '../streets/district-card';
 import { districtStats, type DistrictKind, type DistrictStats } from '../streets/district-stats';
 import { StreetCard } from '../streets/street-card';
-import { indexByName, selectStreet, type StreetSelection } from '../streets/street-selection';
+import { selectStreet, type StreetSelection } from '../streets/street-selection';
 import { TrackingStore } from '../tracking/tracking.store';
 
 const TOULOUSE_CENTER: [number, number] = [1.4442, 43.6045];
@@ -165,7 +165,6 @@ export class MapView implements OnDestroy {
   protected readonly districtMode = signal(false);
   /** Rue sélectionnée par un tap (feature « détail d'une rue »). */
   protected readonly selection = signal<StreetSelection | null>(null);
-  private byName?: { version: string; index: ReturnType<typeof indexByName> };
   /** Quartier dont on a tapé le nom (feature « stats d'un quartier »). */
   protected readonly districtSelection = signal<{ stats: DistrictStats; outline: Feature<MultiLineString> } | null>(null);
   /** Tronçons de chaque petit quartier (petits-quartiers-troncons.json). */
@@ -329,7 +328,8 @@ export class MapView implements OnDestroy {
         type: 'line',
         source: 'selection-halo',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#1E88E5', 'line-width': width(18), 'line-opacity': 0.35, 'line-blur': 2 },
+        // Bleu clair OPAQUE : aucun assombrissement là où des morceaux se superposent.
+        paint: { 'line-color': '#A9D2F5', 'line-width': width(18), 'line-blur': 1.5 },
       },
       beforeLabels,
     );
@@ -480,13 +480,12 @@ export class MapView implements OnDestroy {
   }
 
   private selectDistrict(name: string, kind: DistrictKind, feature: Feature): void {
-    const data = this.coverage.coverageData();
-    const streets = data?.streets;
-    if (!streets) return;
+    const ctx = this.coverage.context();
+    if (!ctx) return;
     const ids = kind === 'small'
       ? this.smallSegments?.[name] ?? []
-      : streets.segments.filter((s) => s.district === name).map((s) => s.id);
-    const stats = districtStats(name, kind, ids, streets, data?.segments ?? {});
+      : ctx.streets.segments.filter((s) => s.district === name).map((s) => s.id);
+    const stats = districtStats(name, kind, ids, ctx);
     let outline: Feature<MultiLineString>;
     if (kind === 'small') {
       outline = this.smallOutlines.get(name) ?? { type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: [] } };
@@ -503,8 +502,8 @@ export class MapView implements OnDestroy {
   private onMapClick(x: number, y: number): void {
     const map = this.map;
     this.districtSelection.set(null); // tout tap sur la carte ferme les stats du quartier
-    const data = this.coverage.coverageData();
-    if (!map || !data || !map.getLayer('streets')) return;
+    const ctx = this.coverage.context();
+    if (!map || !ctx || !map.getLayer('streets')) return;
     const r = 14; // zone de tap élargie autour du trait
     const box: [[number, number], [number, number]] = [[x - r, y - r], [x + r, y + r]];
     // Tap sur la rue déjà sélectionnée : on la garde.
@@ -515,10 +514,7 @@ export class MapView implements OnDestroy {
       this.selection.set(null);
       return;
     }
-    if (this.byName?.version !== data.streets.version) {
-      this.byName = { version: data.streets.version, index: indexByName(data.streets) };
-    }
-    this.selection.set(selectStreet(id, data.streets, this.byName.index, data.segments));
+    this.selection.set(selectStreet(id, ctx));
   }
 
   protected km(value: number): string {

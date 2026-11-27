@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import type { StreetSelection } from './street-selection';
 
 /** Carte compacte en bas de l'écran : stats de la rue sélectionnée. */
@@ -11,7 +11,7 @@ import type { StreetSelection } from './street-selection';
       <div class="head">
         <div class="title">
           <strong>{{ s.name }}</strong>
-          <span class="badge" [class.gold]="fullyGold()">{{ fullyGold() ? 'Validée' : 'En cours' }}</span>
+          <span class="badge" [class.gold]="s.status === 'gold'">{{ s.status === 'gold' ? 'Validée' : 'En cours' }}</span>
         </div>
         <button type="button" class="close" (click)="closed.emit()" aria-label="Fermer">✕</button>
       </div>
@@ -19,11 +19,10 @@ import type { StreetSelection } from './street-selection';
         <div class="district">{{ s.district }}</div>
       }
       <dl>
-        <div><dt>Parcourue</dt><dd>{{ pct(s.doneM / s.lengthM) }} <small>({{ m(s.doneM) }} / {{ m(s.lengthM) }})</small></dd></div>
-        <div><dt>Meilleure marche</dt><dd>{{ pct(s.bestWalkRatio) }}</dd></div>
+        <div class="wide"><dt>Parcourue (meilleure marche)</dt><dd>{{ pct(s.bestM / s.lengthM) }} <small>({{ m(s.bestM) }} / {{ m(s.lengthM) }})</small></dd></div>
         <div><dt>Passages</dt><dd>{{ s.passages }}</dd></div>
         <div><dt>Dernier passage</dt><dd>{{ s.lastAt ? date(s.lastAt) : '–' }}</dd></div>
-        <div class="wide"><dt>Tronçons</dt><dd>{{ s.gold }} doré{{ s.gold > 1 ? 's' : '' }} · {{ s.pink }} rose{{ s.pink > 1 ? 's' : '' }} · {{ s.none }} non fait{{ s.none > 1 ? 's' : '' }}</dd></div>
+        <div class="wide"><dt>Tronçons parcourus</dt><dd>{{ s.segmentsDone }} <small>/ {{ s.segmentIds.length }}</small></dd></div>
       </dl>
     </div>
   `,
@@ -50,11 +49,6 @@ import type { StreetSelection } from './street-selection';
 export class StreetCard {
   readonly selection = input.required<StreetSelection>();
   readonly closed = output<void>();
-
-  protected readonly fullyGold = computed(() => {
-    const s = this.selection();
-    return s.gold > 0 && s.pink === 0 && s.none === 0;
-  });
 
   protected pct(r: number): string {
     return `${Math.round(Math.min(1, r) * 100)} %`;
