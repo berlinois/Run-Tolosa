@@ -68,3 +68,18 @@ export function saveBasemapChoice(id: BasemapId): void {
     // stockage indisponible : le choix ne sera simplement pas retenu
   }
 }
+
+/**
+ * Où insérer les calques de l'appli dans un style : au-dessus de toute la
+ * géométrie du fond (routes, bâtiments…) mais sous les textes qui suivent.
+ * Prendre simplement le premier calque « symbol » ne suffit pas : certains
+ * styles (Plan) ont des symboles au milieu des routes (flèches de sens unique),
+ * et nos traits se retrouvaient alors recouverts par les routes.
+ */
+export function overlayInsertionPoint(layers: readonly { id: string; type: string }[]): string | undefined {
+  let lastGeometry = -1;
+  layers.forEach((l, i) => {
+    if (l.type !== 'symbol') lastGeometry = i;
+  });
+  return layers.slice(lastGeometry + 1).find((l) => l.type === 'symbol')?.id;
+}

@@ -14,7 +14,7 @@ import { Capacitor } from '@capacitor/core';
 import { LngLatBounds, Map as MlMap, Marker, type GeoJSONSource } from 'maplibre-gl';
 import type { Feature, FeatureCollection, MultiLineString, MultiPolygon, Point, Polygon } from 'geojson';
 import { LocationService } from '../core/location.service';
-import { BASEMAPS, basemapById, loadBasemapChoice, saveBasemapChoice, type Basemap, type BasemapId } from './basemaps';
+import { BASEMAPS, basemapById, overlayInsertionPoint, loadBasemapChoice, saveBasemapChoice, type Basemap, type BasemapId } from './basemaps';
 import { CoverageStore } from '../streets/coverage.store';
 import { TrackingStore } from '../tracking/tracking.store';
 
@@ -225,8 +225,8 @@ export class MapView implements OnDestroy {
 
   private addOverlays(map: MlMap): void {
     const empty = { type: 'FeatureCollection' as const, features: [] };
-    // Sous les noms de rues du fond de carte (premier calque de texte), pour qu'ils restent lisibles.
-    const beforeLabels = map.getStyle().layers.find((l) => l.type === 'symbol')?.id;
+    // Au-dessus de toute la géométrie du fond, sous ses textes (noms de rues lisibles).
+    const beforeLabels = overlayInsertionPoint(map.getStyle().layers);
     const dark = this.basemap().dark;
     const width = (base: number) =>
       ['interpolate', ['exponential', 1.6], ['zoom'], 12, base * 0.4, 15, base, 18, base * 2.6] as never;

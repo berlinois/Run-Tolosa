@@ -1,4 +1,4 @@
-import { BASEMAPS, basemapById } from './basemaps';
+import { BASEMAPS, basemapById, overlayInsertionPoint } from './basemaps';
 
 describe('basemaps', () => {
   it('propose les 5 fonds, avec des identifiants uniques', () => {
@@ -18,5 +18,19 @@ describe('basemaps', () => {
     expect(tiles).toContain('LAYER=ORTHOIMAGERY.ORTHOPHOTOS');
     expect(tiles).toContain('TILEMATRIX={z}&TILEROW={y}&TILECOL={x}');
     expect(tiles).not.toMatch(/apikey/i);
+  });
+
+  it('insère nos calques après toute la géométrie, même avec des symboles au milieu des routes', () => {
+    const layers = [
+      { id: 'background', type: 'background' },
+      { id: 'road_minor', type: 'line' },
+      { id: 'road_oneway_arrow', type: 'symbol' },
+      { id: 'road_major', type: 'line' },
+      { id: 'building', type: 'fill' },
+      { id: 'road_label', type: 'symbol' },
+      { id: 'place_label', type: 'symbol' },
+    ];
+    expect(overlayInsertionPoint(layers)).toBe('road_label');
+    expect(overlayInsertionPoint([{ id: 'ign', type: 'raster' }])).toBeUndefined();
   });
 });
