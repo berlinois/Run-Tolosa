@@ -24,11 +24,11 @@ Légende : ✅ fait · 🧪 en test · ⏳ prévu · 💡 idée
   - **Rose** (parcourue) : au moins 30 % de la rue, ou au moins 300 m
   - Les traits passent au-dessus du fond de carte et sous les noms de rues. Les rues jamais parcourues n'ont pas de trait, et la trace des marches terminées n'est pas affichée
   - Bords de Garonne et canal du Midi compris. Parkings, allées privées, voies rapides et trottoirs exclus
-  - **Détail d'une rue** : un tap sur une rue rose ou dorée sélectionne **toute la rue**, avec un **halo bleu** continu. La couleur ne reste que sur les **mètres réellement parcourus**. Une carte en bas affiche le % parcouru lors de la meilleure marche, les passages, le dernier passage et les tronçons parcourus. Un tap ailleurs ferme tout
+  - **Détail d'une rue** : un tap sur une rue rose ou dorée sélectionne **toute la rue**, avec un **halo bleu** continu. La couleur ne reste que sur les **mètres réellement parcourus**. Une carte en bas affiche le % parcouru lors de la meilleure marche, les passages, le dernier passage et les tronçons parcourus. La carte se recadre pour montrer toute la rue entre la légende et la carte de stats. Un tap ailleurs ferme tout
 - 🧪 **Quartiers**
   - **104 petits quartiers** (Guilheméry, Bonhoure, Côte Pavée…) en pointillés rose brique, avec leur nom au centre de la zone à partir du zoom 13,5. Les contours viennent des IRIS (INSEE/IGN), avec les noms de quartiers OSM. Un nom de rue est remplacé par le quartier qui se trouve dans la zone, ou le plus proche (`scripts/build-neighbourhoods.mjs`)
   - **Interrupteur « 🗺 Quartiers »** (en haut à droite). **Activé** : dézoom sur tout Toulouse, avec les **20 grands quartiers** teintés, en pointillés et nommés. **Désactivé** : retour aux petits quartiers, sans bouger la carte
-  - ✅ **Stats d'un quartier** : un tap sur le **nom** d'un quartier met un halo bleu sur son contour et ouvre une carte de stats. On y trouve une barre validé / parcouru, les rues dorées et parcourues sur le total, les km, les marches, le dernier passage et les tronçons
+  - ✅ **Stats d'un quartier** : un tap sur le **nom** d'un quartier met un halo bleu sur son contour et ouvre une carte de stats. On y trouve une barre validé / parcouru, les rues dorées et parcourues sur le total, les km, les marches, le dernier passage et les tronçons. La carte se recadre pour montrer tout le quartier entre la légende et la carte de stats
 - ✅ **Mes données**
   - **Extraire mes marches** : bouton rond ⤓, puis une popup de confirmation. Le zip des traces brutes va dans **Téléchargements** par défaut, ou à un autre emplacement au choix
 - ✅ **Appli**

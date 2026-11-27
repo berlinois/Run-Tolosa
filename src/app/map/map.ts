@@ -6,6 +6,7 @@ import {
   afterNextRender,
   effect,
   inject,
+  Injector,
   signal,
   viewChild,
 } from '@angular/core';
@@ -150,6 +151,7 @@ export class MapView implements OnDestroy {
   private readonly mapEl = viewChild.required<ElementRef<HTMLDivElement>>('mapEl');
   private readonly location = inject(LocationService);
   private readonly tracking = inject(TrackingStore);
+  private readonly injector = inject(Injector);
   private map?: MlMap;
   /** Incrémenté à chaque (re)chargement de style : les calques de l'appli sont alors prêts. */
   private readonly styleReady = signal(0);
@@ -496,6 +498,35 @@ export class MapView implements OnDestroy {
     }
     this.selection.set(null);
     this.districtSelection.set({ stats, outline });
+    this.fitToSelection(outline.geometry.coordinates, 'app-district-card', 16);
+  }
+
+  /**
+   * Cadre la forme sélectionnée dans la partie VISIBLE de la carte : sous la
+   * légende, au-dessus de la carte de stats (mesurée une fois affichée) et à
+   * gauche de la colonne de boutons.
+   */
+  private fitToSelection(lines: number[][][], cardSelector: string, maxZoom: number): void {
+    const map = this.map;
+    if (!map) return;
+    const bounds = new LngLatBounds();
+    for (const line of lines) for (const [lon, lat] of line) bounds.extend([lon, lat]);
+    if (bounds.isEmpty()) return;
+    // Après le prochain rendu : la carte de stats est alors dans le DOM et mesurable.
+    afterNextRender(() => {
+      const container = map.getContainer().getBoundingClientRect();
+      const card = document.querySelector(`${cardSelector} .card`)?.getBoundingClientRect();
+      const legend = document.querySelector('app-map .legend')?.getBoundingClientRect();
+      const top = Math.max(24, (legend?.bottom ?? 0) - container.top) + 16;
+      const bottom = Math.max(110, card ? container.bottom - card.top : 0) + 16;
+      // Si l'écran est trop petit pour ces marges, on se contente de marges minimales.
+      const tooTall = top + bottom > container.height - 80;
+      map.fitBounds(bounds, {
+        padding: tooTall ? { top: 24, bottom: 24, left: 16, right: 16 } : { top, bottom, left: 20, right: 80 },
+        maxZoom,
+        duration: 700,
+      });
+    }, { injector: this.injector });
   }
 
   /** Tap : une rue rose ou dorée sous le doigt → sélection ; ailleurs → on désélectionne. */
@@ -514,7 +545,9 @@ export class MapView implements OnDestroy {
       this.selection.set(null);
       return;
     }
-    this.selection.set(selectStreet(id, ctx));
+    const sel = selectStreet(id, ctx);
+    this.selection.set(sel);
+    if (sel) this.fitToSelection(sel.halo.geometry.coordinates, 'app-street-card', 17.5);
   }
 
   protected km(value: number): string {
