@@ -242,3 +242,27 @@ const contours = (name, ringsList) => {
 contours('petits-quartiers-contours.geojson', smallRings);
 contours('grands-quartiers-contours.geojson', bigFeatures.flatMap((f) =>
   f.geometry.type === 'Polygon' ? f.geometry.coordinates : f.geometry.coordinates.flat()));
+
+// ---- Tronçons de chaque petit quartier (milieu du tronçon dans une zone IRIS du quartier).
+const streetsFile = JSON.parse(readFileSync('public/streets/toulouse.json', 'utf8'));
+const irisBoxes = iris.features.map((f) => {
+  const pts = rings(f.geometry).flat();
+  return {
+    f,
+    box: [Math.min(...pts.map((p) => p[0])), Math.min(...pts.map((p) => p[1])), Math.max(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[1]))],
+  };
+});
+const segmentsByQuarter = {};
+let unassigned = 0;
+for (const [id, , , , , flat] of streetsFile.segments) {
+  const n = flat.length / 2;
+  const mid = Math.floor(n / 2);
+  // Milieu du tronçon : sommet central, ou milieu des deux sommets centraux.
+  const x = n % 2 ? flat[mid * 2] : (flat[(mid - 1) * 2] + flat[mid * 2]) / 2;
+  const y = n % 2 ? flat[mid * 2 + 1] : (flat[(mid - 1) * 2 + 1] + flat[mid * 2 + 1]) / 2;
+  const hit = irisBoxes.find(({ f, box }) => x >= box[0] && x <= box[2] && y >= box[1] && y <= box[3] && insideAny(x, y, [f.geometry]));
+  if (!hit) { unassigned++; continue; }
+  (segmentsByQuarter[hit.f.properties.quartier] ??= []).push(id);
+}
+writeFileSync('public/streets/petits-quartiers-troncons.json', JSON.stringify({ streetsVersion: streetsFile.version, quartiers: segmentsByQuarter }));
+console.log(`Tronçons rattachés aux petits quartiers : ${streetsFile.segments.length - unassigned} (${unassigned} hors zones)`);

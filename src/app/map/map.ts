@@ -16,6 +16,8 @@ import type { Feature, FeatureCollection, MultiLineString, MultiPolygon, Point, 
 import { LocationService } from '../core/location.service';
 import { BASEMAPS, basemapById, overlayInsertionPoint, loadBasemapChoice, saveBasemapChoice, type Basemap, type BasemapId } from './basemaps';
 import { CoverageStore } from '../streets/coverage.store';
+import { DistrictCard } from '../streets/district-card';
+import { districtStats, type DistrictKind, type DistrictStats } from '../streets/district-stats';
 import { StreetCard } from '../streets/street-card';
 import { indexByName, selectStreet, type StreetSelection } from '../streets/street-selection';
 import { TrackingStore } from '../tracking/tracking.store';
@@ -30,7 +32,7 @@ const LIVE_COLOR = '#1E88E5';
 
 @Component({
   selector: 'app-map',
-  imports: [StreetCard],
+  imports: [StreetCard, DistrictCard],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div #mapEl class="map"></div>
@@ -85,6 +87,9 @@ const LIVE_COLOR = '#1E88E5';
 
     @if (selection(); as sel) {
       <app-street-card [selection]="sel" (closed)="selection.set(null)" />
+    }
+    @if (districtSelection(); as d) {
+      <app-district-card [stats]="d.stats" (closed)="districtSelection.set(null)" />
     }
 
     @if (status(); as msg) {
@@ -161,6 +166,11 @@ export class MapView implements OnDestroy {
   /** Rue sélectionnée par un tap (feature « détail d'une rue »). */
   protected readonly selection = signal<StreetSelection | null>(null);
   private byName?: { version: string; index: ReturnType<typeof indexByName> };
+  /** Quartier dont on a tapé le nom (feature « stats d'un quartier »). */
+  protected readonly districtSelection = signal<{ stats: DistrictStats; outline: Feature<MultiLineString> } | null>(null);
+  /** Tronçons de chaque petit quartier (petits-quartiers-troncons.json). */
+  private smallSegments?: Record<string, string[]>;
+  private smallOutlines = new Map<string, Feature<MultiLineString>>();
 
   protected readonly coverage = inject(CoverageStore);
   protected readonly basemaps = BASEMAPS;
@@ -204,6 +214,12 @@ export class MapView implements OnDestroy {
       this.source('selection-parts')?.setData(sel ? sel.parts : empty);
       const filter = sel ? (['!', ['in', ['get', 'id'], ['literal', sel.segmentIds]]] as never) : null;
       for (const id of ['streets', 'streets-casing']) if (this.map?.getLayer(id)) this.map.setFilter(id, filter);
+    });
+    // Quartier sélectionné : contour en halo bleu.
+    effect(() => {
+      if (!this.styleReady()) return;
+      const d = this.districtSelection();
+      this.source('district-selection')?.setData(d ? d.outline : { type: 'FeatureCollection', features: [] });
     });
     // Mode Quartiers : contours plus marqués, zones teintées, tous les noms.
     effect(() => {
@@ -345,6 +361,17 @@ export class MapView implements OnDestroy {
     };
     dashed('districts', 'districts', !mode, 1.8);
     dashed('districts-big', 'districts-big-lines', mode, 2.6);
+    map.addSource('district-selection', { type: 'geojson', data: empty });
+    map.addLayer(
+      {
+        id: 'district-selection',
+        type: 'line',
+        source: 'district-selection',
+        layout: { 'line-join': 'round' },
+        paint: { 'line-color': '#1E88E5', 'line-width': 5, 'line-opacity': 0.7, 'line-blur': 1 },
+      },
+      beforeLabels,
+    );
 
     map.addSource('live', { type: 'geojson', data: empty });
     map.addLayer({
@@ -371,27 +398,37 @@ export class MapView implements OnDestroy {
 
   private async loadDistricts(map: MlMap): Promise<void> {
     try {
-      const [big, small, smallBorders, bigBorders] = (await Promise.all(
+      const [big, small, smallBorders, bigBorders, smallSegs] = (await Promise.all(
         [
           'streets/grands-quartiers.geojson',
           'streets/petits-quartiers.geojson',
           'streets/petits-quartiers-contours.geojson',
           'streets/grands-quartiers-contours.geojson',
+          'streets/petits-quartiers-troncons.json',
         ].map((url) => fetch(url).then((r) => (r.ok ? r.json() : null))),
       )) as [
         FeatureCollection<Polygon | MultiPolygon> | null,
         FeatureCollection<MultiLineString> | null,
         FeatureCollection<MultiLineString> | null,
         FeatureCollection<MultiLineString> | null,
+        { quartiers: Record<string, string[]> } | null,
       ];
       if (big) this.bigDistricts.set(withColors(big));
       if (smallBorders) this.smallBorders.set(smallBorders);
       if (bigBorders) this.bigBorders.set(bigBorders);
+      this.smallSegments = smallSegs?.quartiers;
+      for (const f of small?.features ?? []) this.smallOutlines.set(String(f.properties?.['name']), f);
       // Noms : marqueurs HTML (indépendants des polices du fond de carte), au centre visuel.
-      const label = (f: Feature, kind: 'small' | 'big') => {
+      const label = (f: Feature, kind: DistrictKind) => {
         const el = document.createElement('div');
         el.className = `district-label ${kind}`;
-        el.textContent = String(f.properties?.['name'] ?? '');
+        const name = String(f.properties?.['name'] ?? '');
+        el.textContent = name;
+        // Tap sur le nom → stats du quartier (le tap ne descend pas jusqu'à la carte).
+        el.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          this.selectDistrict(name, kind, f);
+        });
         const { labelLon, labelLat } = f.properties as { labelLon: number; labelLat: number };
         return new Marker({ element: el }).setLngLat([labelLon, labelLat]).addTo(map);
       };
@@ -442,9 +479,30 @@ export class MapView implements OnDestroy {
     map.fitBounds(bounds, { padding: { top: 64, bottom: 96, left: 8, right: 8 }, bearing: 0, pitch: 0, duration: 900 });
   }
 
+  private selectDistrict(name: string, kind: DistrictKind, feature: Feature): void {
+    const data = this.coverage.coverageData();
+    const streets = data?.streets;
+    if (!streets) return;
+    const ids = kind === 'small'
+      ? this.smallSegments?.[name] ?? []
+      : streets.segments.filter((s) => s.district === name).map((s) => s.id);
+    const stats = districtStats(name, kind, ids, streets, data?.segments ?? {});
+    let outline: Feature<MultiLineString>;
+    if (kind === 'small') {
+      outline = this.smallOutlines.get(name) ?? { type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: [] } };
+    } else {
+      const g = feature.geometry as Polygon | MultiPolygon;
+      const rings = g.type === 'Polygon' ? g.coordinates : g.coordinates.flat();
+      outline = { type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: rings } };
+    }
+    this.selection.set(null);
+    this.districtSelection.set({ stats, outline });
+  }
+
   /** Tap : une rue rose ou dorée sous le doigt → sélection ; ailleurs → on désélectionne. */
   private onMapClick(x: number, y: number): void {
     const map = this.map;
+    this.districtSelection.set(null); // tout tap sur la carte ferme les stats du quartier
     const data = this.coverage.coverageData();
     if (!map || !data || !map.getLayer('streets')) return;
     const r = 14; // zone de tap élargie autour du trait

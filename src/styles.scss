@@ -14,7 +14,7 @@ html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
   line-height: 1.25;
   text-align: center;
   box-shadow: 0 1px 3px #0003;
-  pointer-events: none;
+  cursor: pointer; /* tap sur le nom → stats du quartier */
 }
 .district-label.big { display: none; font-size: 10px; max-width: 96px; color: #6d2533; }
 .district-labels-hidden .district-label.small { display: none; }

@@ -129,6 +129,10 @@ réglés sur une vraie marche : un point par seconde, précision médiane de 4,5
    - Chaque tronçon est rattaché à l'un des **20 quartiers officiels**
      (OSM `admin_level=10`), pour les futures stats par quartier.
    - Volume : environ 37 800 tronçons, 1 940 km, 4,2 Mo.
+   - Les petits quartiers sont construits à partir des IRIS par
+     `scripts/build-neighbourhoods.mjs`, qui produit aussi
+     `petits-quartiers-troncons.json` : les tronçons de chaque petit
+     quartier, rattachés par le milieu du tronçon.
    - L'extraction tourne dans GitHub Actions (workflow « Extraction des rues
      OSM », lancé à la main), qui commite le fichier.
 2. **Les points de la trace** : on garde les points dont la précision est
@@ -166,6 +170,8 @@ src/app/
     coverage.store.ts      coverage.json, rues dorées, stats     ✅ Phase 2
     street-selection.ts    rue entière, stats, parties faites    ✅
     street-card.ts         carte « détail d'une rue »            ✅
+    district-stats.ts      stats d'un quartier                   ✅
+    district-card.ts       carte « stats d'un quartier »         ✅
   map/map.ts               carte MapLibre + calques de l'appli   ✅
   map/basemaps.ts          fonds : OpenFreeMap + IGN (WMTS)      ✅
   tracking/
