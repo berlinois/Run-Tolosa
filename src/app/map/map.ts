@@ -125,7 +125,8 @@ export class MapView implements OnDestroy {
   private readonly styleReady = signal(0);
   private readonly myPosition = signal<Feature<Point> | null>(null);
   private statusTimer?: ReturnType<typeof setTimeout>;
-  /** Contours des quartiers (test d'affichage, public/streets/quartiers.geojson). */
+  /** Grands quartiers (20) et petits quartiers (IRIS renommés), affichage de test. */
+  private readonly bigDistricts = signal<FeatureCollection<MultiLineString> | null>(null);
   private readonly districts = signal<FeatureCollection<MultiLineString> | null>(null);
   private districtMarkers: Marker[] = [];
 
@@ -157,6 +158,8 @@ export class MapView implements OnDestroy {
       if (!this.styleReady()) return;
       const d = this.districts();
       if (d) this.source('districts')?.setData(d);
+      const b = this.bigDistricts();
+      if (b) this.source('districts-big')?.setData(b);
     });
     effect(() => {
       if (!this.styleReady()) return;
@@ -206,7 +209,17 @@ export class MapView implements OnDestroy {
     const width = (base: number) =>
       ['interpolate', ['exponential', 1.6], ['zoom'], 12, base * 0.4, 15, base, 18, base * 2.6] as never;
 
-    // Contours des quartiers : pointillés rose brique, sous les rues dorées.
+    // Grands quartiers : trait épais et discret. Petits quartiers : pointillés rose brique.
+    map.addSource('districts-big', { type: 'geojson', data: empty });
+    map.addLayer(
+      {
+        id: 'districts-big',
+        type: 'line',
+        source: 'districts-big',
+        paint: { 'line-color': dark ? '#F48FB1' : '#B8505E', 'line-width': 4, 'line-opacity': 0.25 },
+      },
+      beforeLabels,
+    );
     map.addSource('districts', { type: 'geojson', data: empty });
     map.addLayer(
       {
@@ -222,7 +235,7 @@ export class MapView implements OnDestroy {
         id: 'districts',
         type: 'line',
         source: 'districts',
-        paint: { 'line-color': dark ? '#F48FB1' : '#B8505E', 'line-width': 2.2, 'line-dasharray': [3, 2] },
+        paint: { 'line-color': dark ? '#F48FB1' : '#B8505E', 'line-width': 1.8, 'line-dasharray': [3, 2] },
       },
       beforeLabels,
     );
@@ -274,19 +287,26 @@ export class MapView implements OnDestroy {
 
   private async loadDistricts(map: MlMap): Promise<void> {
     try {
-      const res = await fetch('streets/quartiers.geojson');
-      if (!res.ok) return;
-      const data = (await res.json()) as FeatureCollection<MultiLineString>;
-      this.districts.set(data);
-      // Noms des quartiers : marqueurs HTML (indépendants des polices du fond de carte).
-      this.districtMarkers = data.features.map((f) => {
+      const [big, small] = await Promise.all(
+        ['streets/quartiers.geojson', 'streets/petits-quartiers.geojson'].map((url) =>
+          fetch(url).then((r) => (r.ok ? (r.json() as Promise<FeatureCollection<MultiLineString>>) : null)),
+        ),
+      );
+      if (big) this.bigDistricts.set(big);
+      if (!small) return;
+      this.districts.set(small);
+      // Noms des petits quartiers : marqueurs HTML (indépendants des polices du fond de carte).
+      this.districtMarkers = small.features.map((f) => {
         const el = document.createElement('div');
         el.className = 'district-label';
-        const ref = f.properties?.['ref'];
-        el.textContent = `${ref ? `${ref} · ` : ''}${f.properties?.['name'] ?? ''}`;
+        el.textContent = String(f.properties?.['name'] ?? '');
         const { labelLon, labelLat } = f.properties as { labelLon: number; labelLat: number };
         return new Marker({ element: el }).setLngLat([labelLon, labelLat]).addTo(map);
       });
+      // Noms masqués quand on dézoome trop : ils se chevaucheraient.
+      const toggle = () => map.getContainer().classList.toggle('district-labels-hidden', map.getZoom() < 13.5);
+      map.on('zoom', toggle);
+      toggle();
     } catch {
       // affichage de test : sans contours, la carte fonctionne normalement
     }

@@ -4,7 +4,7 @@ html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
 
 /* Noms des quartiers (marqueurs MapLibre, hors composant). */
 .district-label {
-  max-width: 130px;
+  max-width: 120px;
   padding: 3px 7px;
   border-radius: 8px;
   background: #fffd;
@@ -16,3 +16,4 @@ html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
   box-shadow: 0 1px 3px #0003;
   pointer-events: none;
 }
+.district-labels-hidden .district-label { display: none; }

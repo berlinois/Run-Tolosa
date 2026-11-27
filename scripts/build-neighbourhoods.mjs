@@ -24,15 +24,18 @@ const known = new Map(); // forme normalisée → graphie à afficher
 for (const p of iris.places) known.set(norm(p.name), p.name);
 for (const f of big.features) for (const part of String(f.properties.name).split('/')) {
   const n = part.trim();
-  if (n.length >= 4 && !known.has(norm(n))) known.set(norm(n), n);
+  const k = norm(n);
+  // Variante d'orthographe d'un nom OSM (Montplaisir / Monplaisir) : on garde celle d'OSM.
+  const variant = [...known.keys()].some((o) => o.length >= 7 && k.length >= 7 && lev(o, k) <= 1);
+  if (n.length >= 4 && !known.has(k) && !variant) known.set(k, n);
 }
 const words = (s) => ` ${s} `;
 /** Le nom IRIS est-il un vrai nom de quartier ? Renvoie la graphie à garder, ou null. */
 function quarterName(irisName) {
   const n = norm(irisName);
-  if (known.has(n)) return irisName;
-  for (const k of known.keys()) {
-    if (k.length >= 6 && n.length >= 6 && lev(k, n) <= 2) return irisName; // Montplaisir ≈ Monplaisir
+  if (known.has(n)) return known.get(n); // graphie OSM : « Ponts-Jumeaux »
+  for (const [k, display] of known) {
+    if (k.length >= 7 && n.length >= 7 && lev(k, n) <= 1) return display; // Montplaisir → Monplaisir, Michoum → Michoun
     if (k.length >= 5 && words(n).includes(words(k))) return irisName; // « Lalande Nord », « Cité Amouroux »
   }
   return null;

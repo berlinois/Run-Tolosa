@@ -15,6 +15,7 @@ on:
       - scripts/extract-streets.mjs
       - scripts/extract-districts.mjs
       - scripts/extract-iris.mjs
+      - scripts/build-neighbourhoods.mjs
       - .github/workflows/extract-streets.yml
 
 concurrency:
@@ -46,7 +47,9 @@ jobs:
 
       - name: Extraction des IRIS (petits quartiers)
         if: ${{ github.event_name == 'push' || inputs.what == 'tout' || inputs.what == 'iris' }}
-        run: node scripts/extract-iris.mjs
+        run: |
+          node scripts/extract-iris.mjs
+          node scripts/build-neighbourhoods.mjs
 
       - name: Commit du référentiel
         run: |
