@@ -72,6 +72,50 @@ for (const f of iris.features) for (const r of rings(f.geometry)) for (let i = 1
 const groups = new Map();
 for (const f of iris.features) (groups.get(f.properties.quartier) ?? groups.set(f.properties.quartier, []).get(f.properties.quartier)).push(f);
 
+// Centre visuel (« pôle d'inaccessibilité ») : le point de la zone le plus éloigné
+// de ses bords extérieurs. Recherche sur grille puis affinages successifs.
+const K = Math.cos((43.6 * Math.PI) / 180); // longitude → distance comparable à la latitude
+function inRing(x, y, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+const insideAny = (x, y, geoms) => geoms.some((g) =>
+  (g.type === 'Polygon' ? [g.coordinates] : g.coordinates).some((poly) => inRing(x, y, poly[0]) && !poly.slice(1).some((h) => inRing(x, y, h))));
+function distToLines(x, y, lines) {
+  let best = Infinity;
+  for (const l of lines) for (let i = 1; i < l.length; i++) {
+    const ax = l[i - 1][0] * K, ay = l[i - 1][1], bx = l[i][0] * K, by = l[i][1], px = x * K;
+    const dx = bx - ax, dy = by - ay;
+    const t = dx || dy ? Math.max(0, Math.min(1, ((px - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy))) : 0;
+    best = Math.min(best, Math.hypot(px - (ax + t * dx), y - (ay + t * dy)));
+  }
+  return best;
+}
+function visualCenter(geoms, lines) {
+  const pts = lines.flat();
+  let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const [x, y] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  let best = null, bestD = -1;
+  let cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, w = x1 - x0, h = y1 - y0;
+  for (let pass = 0; pass < 5; pass++) {
+    const n = pass === 0 ? 40 : 12;
+    for (let i = 0; i <= n; i++) for (let j = 0; j <= n; j++) {
+      const x = cx - w / 2 + (w * i) / n, y = cy - h / 2 + (h * j) / n;
+      if (!insideAny(x, y, geoms)) continue;
+      const d = distToLines(x, y, lines);
+      if (d > bestD) { bestD = d; best = [x, y]; }
+    }
+    if (!best) break;
+    [cx, cy] = best; w /= 6; h /= 6;
+  }
+  const r = (v) => Math.round(v * 1e6) / 1e6;
+  return best ? [r(best[0]), r(best[1])] : [r((x0 + x1) / 2), r((y0 + y1) / 2)];
+}
+
 const features = [];
 for (const [name, members] of groups) {
   const lines = [];
@@ -86,11 +130,7 @@ for (const [name, members] of groups) {
     }
     if (run.length > 1) lines.push(run);
   }
-  const place = placeByName.get(name);
-  const biggest = members.reduce((a, b) => (JSON.stringify(a.geometry).length >= JSON.stringify(b.geometry).length ? a : b));
-  const label = place && members.some((m) => m.properties.osmNames.includes(name))
-    ? [place.lon, place.lat]
-    : [biggest.properties.labelLon, biggest.properties.labelLat];
+  const label = visualCenter(members.map((m) => m.geometry), lines);
   features.push({
     type: 'Feature',
     properties: { name, iris: members.map((m) => m.properties.code), labelLon: label[0], labelLat: label[1] },

@@ -244,6 +244,29 @@ export class MapView implements OnDestroy {
       },
       beforeLabels,
     );
+    map.addSource('streets', { type: 'geojson', data: empty });
+    map.addLayer(
+      {
+        id: 'streets-casing',
+        type: 'line',
+        source: 'streets',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': dark ? '#000000' : STREET_CASING, 'line-width': width(8), 'line-opacity': dark ? 0.6 : 0.5 },
+      },
+      beforeLabels,
+    );
+    map.addLayer(
+      {
+        id: 'streets',
+        type: 'line',
+        source: 'streets',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': STREET_COLOR, 'line-width': width(6), 'line-opacity': 0.92 },
+      },
+      beforeLabels,
+    );
+
+    // Contours des quartiers au-dessus des rues dorées (sinon le doré les cache).
     map.addSource('districts-big', { type: 'geojson', data: empty });
     map.addLayer(
       {
@@ -270,28 +293,6 @@ export class MapView implements OnDestroy {
         type: 'line',
         source: 'districts',
         paint: { 'line-color': dark ? '#F48FB1' : '#B8505E', 'line-width': 1.8, 'line-dasharray': [3, 2] },
-      },
-      beforeLabels,
-    );
-
-    map.addSource('streets', { type: 'geojson', data: empty });
-    map.addLayer(
-      {
-        id: 'streets-casing',
-        type: 'line',
-        source: 'streets',
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': dark ? '#000000' : STREET_CASING, 'line-width': width(8), 'line-opacity': dark ? 0.6 : 0.5 },
-      },
-      beforeLabels,
-    );
-    map.addLayer(
-      {
-        id: 'streets',
-        type: 'line',
-        source: 'streets',
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': STREET_COLOR, 'line-width': width(6), 'line-opacity': 0.92 },
       },
       beforeLabels,
     );
