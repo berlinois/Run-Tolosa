@@ -24,7 +24,7 @@ Légende : ✅ fait · 🧪 en test · ⏳ prévu · 💡 idée
   - **Rose** (parcourue) : au moins 30 % de la rue, ou au moins 300 m
   - Les traits passent au-dessus du fond de carte et sous les noms de rues. Les rues jamais parcourues n'ont pas de trait, et la trace des marches terminées n'est pas affichée
   - Bords de Garonne et canal du Midi compris. Parkings, allées privées, voies rapides et trottoirs exclus
-  - **Détail d'une rue** : un tap sur une rue rose ou dorée sélectionne **toute la rue**, avec un **halo bleu** continu. La couleur ne reste que sur les **mètres réellement parcourus**. Une carte en bas affiche le % parcouru lors de la meilleure marche, les passages, le dernier passage et les tronçons parcourus. La carte se recadre pour montrer toute la rue entre la légende et la carte de stats. Un tap ailleurs ferme tout
+  - **Détail d'une rue** : un tap sur une rue rose ou dorée sélectionne **toute la rue**, avec un **halo bleu** continu. La couleur ne reste que sur les **mètres réellement parcourus**. Une frontière de quartier qui suit la rue s'efface presque sous la sélection. Une carte en bas affiche le % parcouru lors de la meilleure marche, les passages, le dernier passage et les tronçons parcourus. La carte se recadre pour montrer toute la rue entre la légende et la carte de stats. Un tap ailleurs ferme tout
 - 🧪 **Quartiers**
   - **104 petits quartiers** (Guilheméry, Bonhoure, Côte Pavée…), avec leur nom au centre de la zone à partir du zoom 13,5.
   - **Frontières** en pointillés **bordeaux foncé** (rose clair sur les fonds sombres) : elles restent visibles même posées sur une rue rose ou dorée

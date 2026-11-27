@@ -344,31 +344,6 @@ export class MapView implements OnDestroy {
       beforeLabels,
     );
 
-    // Rue sélectionnée : halo bleu (rue entière) puis morceaux parcourus.
-    map.addSource('selection-halo', { type: 'geojson', data: empty });
-    map.addLayer(
-      {
-        id: 'selection-halo',
-        type: 'line',
-        source: 'selection-halo',
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        // Bleu clair OPAQUE : aucun assombrissement là où des morceaux se superposent.
-        paint: { 'line-color': '#A9D2F5', 'line-width': width(18), 'line-blur': 1.5 },
-      },
-      beforeLabels,
-    );
-    map.addSource('selection-parts', { type: 'geojson', data: empty });
-    map.addLayer(
-      {
-        id: 'selection-parts',
-        type: 'line',
-        source: 'selection-parts',
-        layout: { 'line-cap': 'butt', 'line-join': 'round' },
-        paint: { 'line-color': ['match', ['get', 'status'], 'gold', STREET_COLOR, PINK_COLOR], 'line-width': width(6) },
-      },
-      beforeLabels,
-    );
-
     // Contours des quartiers au-dessus des rues dorées (sinon le doré les cache).
     // Tous les contours en pointillés : petits quartiers par défaut, grands en mode « Quartiers ».
     map.addSource('districts', { type: 'geojson', data: empty });
@@ -393,6 +368,33 @@ export class MapView implements OnDestroy {
         source: 'district-selection',
         layout: { 'line-join': 'round' },
         paint: { 'line-color': '#1E88E5', 'line-width': 5, 'line-opacity': 0.7, 'line-blur': 1 },
+      },
+      beforeLabels,
+    );
+
+    // Rue sélectionnée : AU-DESSUS des frontières de quartiers (le halo, presque
+    // opaque, ne laisse deviner qu'une trace de frontière sous la rue sélectionnée).
+    map.addSource('selection-halo', { type: 'geojson', data: empty });
+    map.addLayer(
+      {
+        id: 'selection-halo',
+        type: 'line',
+        source: 'selection-halo',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        // Bleu clair presque opaque : frontière à peine visible dessous, et quasiment
+        // pas d'assombrissement là où des morceaux du halo se superposent.
+        paint: { 'line-color': '#A9D2F5', 'line-width': width(18), 'line-blur': 1.5, 'line-opacity': 0.9 },
+      },
+      beforeLabels,
+    );
+    map.addSource('selection-parts', { type: 'geojson', data: empty });
+    map.addLayer(
+      {
+        id: 'selection-parts',
+        type: 'line',
+        source: 'selection-parts',
+        layout: { 'line-cap': 'butt', 'line-join': 'round' },
+        paint: { 'line-color': ['match', ['get', 'status'], 'gold', STREET_COLOR, PINK_COLOR], 'line-width': width(6) },
       },
       beforeLabels,
     );
