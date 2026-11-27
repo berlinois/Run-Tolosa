@@ -15,7 +15,7 @@ import { TrackingStore } from './tracking.store';
             <span>{{ distance(walk.distanceM) }}</span>
             <span class="muted">{{ walk.pointCount }} pts</span>
           </div>
-          <button type="button" class="stop" (click)="store.stop()" [disabled]="store.busy()">■ Arrêter</button>
+          <button type="button" class="stop" (click)="confirmStop.set(true)" [disabled]="store.busy()">■ Arrêter</button>
         } @else {
           <button type="button" class="start" (click)="store.start()" [disabled]="store.busy()">
             ▶ Démarrer une marche
@@ -28,6 +28,23 @@ import { TrackingStore } from './tracking.store';
           <div class="error">{{ err }}</div>
         }
       </div>
+
+      @if (confirmStop() && store.status().walk; as walk) {
+        <div class="backdrop" (click)="confirmStop.set(false)"></div>
+        <div class="dialog confirm" role="alertdialog" aria-modal="true" aria-labelledby="stop-title">
+          <div class="ring" aria-hidden="true">🚶</div>
+          <h2 id="stop-title">Terminer la marche ?</h2>
+          <p>Ta marche est enregistrée, tu peux encore continuer.</p>
+          <div class="mini">
+            <div><b>{{ elapsed() }}</b><span>durée</span></div>
+            <div><b>{{ distance(walk.distanceM) }}</b><span>distance</span></div>
+          </div>
+          <div class="stack">
+            <button type="button" class="green" (click)="stopConfirmed()" [disabled]="store.busy()">✓ Oui, arrêter la marche</button>
+            <button type="button" class="ghost" (click)="confirmStop.set(false)">▶ Continuer à marcher</button>
+          </div>
+        </div>
+      }
 
       @if (store.shortWalk(); as walk) {
         <div class="backdrop"></div>
@@ -67,6 +84,15 @@ import { TrackingStore } from './tracking.store';
     .muted { color: #757575; }
     .small { font-size: 12px; padding-left: 8px; text-shadow: 0 0 3px #fff; }
     .backdrop { position: fixed; inset: 0; z-index: 20; background: #0007; }
+    .confirm { text-align: center; }
+    .confirm .ring { width: 60px; height: 60px; margin: 0 auto 10px; border-radius: 50%; display: grid; place-items: center; background: #fdecef; font-size: 28px; }
+    .confirm p { margin-top: 4px; }
+    .mini { display: flex; justify-content: center; gap: 24px; margin: 14px 0 18px; }
+    .mini b { display: block; font-size: 22px; } .mini span { font-size: 13px; color: #78909c; }
+    .stack { display: flex; flex-direction: column; gap: 10px; }
+    .stack button { width: 100%; padding: 14px; font-size: 16px; }
+    .green { background: #2E9D57; box-shadow: 0 4px 12px #2e9d5755; }
+    .ghost { background: #f1f3f4; color: #263238; box-shadow: none; }
     .dialog {
       position: fixed; z-index: 21; left: 16px; right: 16px; top: 50%; transform: translateY(-50%);
       max-width: 420px; margin: 0 auto; padding: 20px; border-radius: 16px;
@@ -91,6 +117,13 @@ export class WalkControls {
   });
 
   protected readonly distance = formatDistance;
+  /** Popup « Terminer la marche ? » ouverte. */
+  protected readonly confirmStop = signal(false);
+
+  protected stopConfirmed(): void {
+    this.confirmStop.set(false);
+    void this.store.stop();
+  }
 
   protected duration(walk: { startedAt: number; endedAt: number | null }): string {
     return formatDuration((walk.endedAt ?? Date.now()) - walk.startedAt);

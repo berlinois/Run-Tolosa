@@ -16,6 +16,14 @@ Légende : ✅ fait · 🧪 en test · ⏳ prévu · 💡 idée
 - ✅ **Enregistrer une marche**
   - Bouton « Démarrer / Arrêter ». Le GPS est lu toutes les 2 s, **même écran éteint**, avec une notification qui affiche la distance et un bouton Arrêter
   - **Suivi en direct** : chrono, distance, nombre de points, trace en cours en **bleu**
+  - **Confirmation d'arrêt** : le tap sur « Arrêter » ouvre « Terminer la marche ? », avec la durée et la distance. Le bouton vert **Oui, arrêter la marche** arrête, le bouton **Continuer à marcher** ne coupe rien
+  - **Récap de fin de marche** (style « trophée ») :
+    - le bandeau montre ta trace dorée, la durée, la distance et les quartiers traversés ;
+    - 3 tuiles : rues passées **de rien à rose**, **de rien à doré**, **de rose à doré** ;
+    - la part de Toulouse gagnée, l'allure et les nouveaux quartiers ;
+    - un **record** quand il y en a un (première marche, plus longue marche, record de rues dorées ou ajoutées, sortie la plus matinale) ;
+    - **une stat rigolote**, toujours différente : environ 25 stats en 5 familles (équivalences toulousaines, défis, cumuls, clins d'œil aux rues du jour, records). Aucune ne se répète avant que toutes les autres soient passées (historique dans `recaps.json`) ;
+    - si la marche a été arrêtée depuis la notification, le récap s'affiche à la prochaine ouverture
   - **Marche trop courte** : à l'arrêt d'une marche de moins de 5 min, une popup propose **Supprimer** (rouge, définitif) ou **Sauvegarder quand même**
   - **Données brutes conservées** : chaque point GPS est écrit dès sa réception et n'est jamais modifié
 - ✅ **Rues parcourues**
@@ -41,7 +49,7 @@ Légende : ✅ fait · 🧪 en test · ⏳ prévu · 💡 idée
 - 💡 **À venir**
   - 💡 **Carte interactive des quartiers** : un tap sur un quartier zoome dessus et montre ses rues faites et pas faites
   - 💡 **Parcs** : avec plus de 50 % des chemins d'un parc parcourus, le parc entier est validé, avec une couleur dédiée
-  - 💡 **Dernière marche, marche la plus longue** : mises en valeur (rose ?)
+  - 💡 **Dernière marche, marche la plus longue** : mises en valeur sur la carte
   - 💡 **Gestion des marches** : tableau des marches (date, durée, distance), avec suppression définitive des faux départs
   - ⏳ **Carte hors ligne** (Phase 3) : fond PMTiles de Toulouse embarqué
   - ⏳ **Stats globales** (Phase 4) : % de Toulouse parcouru, couleurs selon l'ancienneté

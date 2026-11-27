@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
+import { RecapStore } from '../recap/recap.store';
 import { CoverageStore } from '../streets/coverage.store';
 import type { TrackPoint, TrackingStatus, Walk } from './model';
 import { isTooShort, linesCollection, trackToLine } from './track-geo';
@@ -22,6 +23,7 @@ export class TrackingStore {
   readonly busy = signal(false);
 
   private readonly coverage = inject(CoverageStore);
+  private readonly recaps = inject(RecapStore);
 
   readonly liveLine = computed(() => linesCollection([trackToLine(this.liveTrack())]));
 
@@ -102,6 +104,7 @@ export class TrackingStore {
     this.busy.set(true);
     try {
       await Tracking.deleteWalk({ walkId: walk.id });
+      await this.recaps.remove(walk.id);
       this.shortWalk.set(null);
       await this.coverage.reset(); // elle a peut-être déjà été comptée : on recalcule
       await this.refresh();

@@ -19,6 +19,9 @@ import type { Position } from '@capacitor/geolocation';
 import { SplashService } from '../core/splash.service';
 import { BASEMAPS, basemapById, overlayInsertionPoint, loadBasemapChoice, saveBasemapChoice, type Basemap, type BasemapId } from './basemaps';
 import { CoverageStore } from '../streets/coverage.store';
+import { RecapCard } from '../recap/recap-card';
+import { RecapStore } from '../recap/recap.store';
+import type { WalkRecap } from '../recap/recap.model';
 import { DistrictCard } from '../streets/district-card';
 import { districtStats, type DistrictKind, type DistrictStats } from '../streets/district-stats';
 import { StreetCard } from '../streets/street-card';
@@ -35,7 +38,7 @@ const LIVE_COLOR = '#1E88E5';
 
 @Component({
   selector: 'app-map',
-  imports: [StreetCard, DistrictCard],
+  imports: [StreetCard, DistrictCard, RecapCard],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div #mapEl class="map"></div>
@@ -90,6 +93,11 @@ const LIVE_COLOR = '#1E88E5';
 
     @if (selection(); as sel) {
       <app-street-card [selection]="sel" (closed)="selection.set(null)" />
+    }
+    @if (recaps.pending(); as r) {
+      @if (!tracking.shortWalk()) {
+        <app-recap-card [recap]="r" (closed)="closeRecap(r)" (showOnMap)="showRecapOnMap(r)" />
+      }
     }
     @if (districtSelection(); as d) {
       <app-district-card [stats]="d.stats" (closed)="districtSelection.set(null)" />
@@ -152,7 +160,8 @@ const LIVE_COLOR = '#1E88E5';
 export class MapView implements OnDestroy {
   private readonly mapEl = viewChild.required<ElementRef<HTMLDivElement>>('mapEl');
   private readonly location = inject(LocationService);
-  private readonly tracking = inject(TrackingStore);
+  protected readonly tracking = inject(TrackingStore);
+  protected readonly recaps = inject(RecapStore);
   private readonly injector = inject(Injector);
   private readonly splash = inject(SplashService);
   /** Position demandée dès le lancement (le GPS travaille pendant l'animation d'accueil). */
@@ -197,6 +206,7 @@ export class MapView implements OnDestroy {
       void this.splash.animationDone.then(() => {
         this.initMap();
         this.tracking.init();
+        void this.recaps.load(); // un récap pas encore vu (marche arrêtée depuis la notification) s'affichera
       });
     });
     if (Capacitor.isNativePlatform()) {
@@ -604,6 +614,20 @@ export class MapView implements OnDestroy {
     const sel = selectStreet(id, ctx);
     this.selection.set(sel);
     if (sel) this.fitToSelection(sel.halo.geometry.coordinates, 'app-street-card', 17.5);
+  }
+
+  protected closeRecap(r: WalkRecap): void {
+    void this.recaps.markShown(r.walkId);
+  }
+
+  /** « Voir sur la carte » : ferme le récap et cadre la marche. */
+  protected showRecapOnMap(r: WalkRecap): void {
+    void this.recaps.markShown(r.walkId);
+    const map = this.map;
+    if (!map || r.trace.length < 2) return;
+    const bounds = new LngLatBounds();
+    for (const p of r.trace) bounds.extend(p);
+    map.fitBounds(bounds, { padding: { top: 140, bottom: 140, left: 30, right: 90 }, maxZoom: 16.5, duration: 800 });
   }
 
   protected km(value: number): string {

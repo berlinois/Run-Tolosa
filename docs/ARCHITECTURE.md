@@ -99,6 +99,7 @@ files/
   walks/<id>.json     Walk
   walks/<id>.jsonl    TrackPoints (bruts, immuables)
   coverage.json       couverture brute par tronçon et par marche (voir ci-dessus)
+  recaps.json         récaps de fin de marche, figés, et historique des stats rigolotes
 ```
 
 Une heure de marche fait environ 1 800 points, soit environ 100 Ko. Une marche
@@ -177,6 +178,11 @@ src/app/
     tracking.store.ts      état des marches (signals)            ✅ Phase 1
     track-geo.ts           traces → GeoJSON, formats             ✅ Phase 1
     walk-controls.ts       Démarrer / Arrêter, chrono            ✅ Phase 1
+  recap/
+    recap-builder.ts       récap : rues avant / après la marche  ✅
+    fun-facts.ts           catalogue des stats rigolotes, records ✅
+    recap.store.ts         recaps.json                           ✅
+    recap-card.ts          carte récap « trophée »               ✅
   export/
     export-button.ts       bouton ⤓ + popup d'extraction         ✅ Phase 1
 android/app/src/main/java/fr/runtolosa/app/

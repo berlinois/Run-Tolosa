@@ -1,8 +1,10 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import type { FeatureCollection, LineString } from 'geojson';
 import type { Walk } from '../tracking/model';
 import { Tracking } from '../tracking/tracking.plugin';
+import { buildRecap } from '../recap/recap-builder';
+import { RecapStore } from '../recap/recap.store';
 import { MATCHER_ID, matchWalk } from './matcher';
 import { computeStreetCoverage, type RawCoverage, type StreetCoverage } from './street-coverage';
 import { buildStreetIndex, type StreetIndex } from './street-index';
@@ -33,6 +35,8 @@ export class CoverageStore {
   private readonly streets = signal<Streets | null>(null);
   private readonly file = signal<CoverageFile | null>(null);
   private running: Promise<void> = Promise.resolve();
+  private readonly recaps = inject(RecapStore);
+  private quartierOf?: Promise<Map<string, string>>;
 
   readonly error = signal<string | null>(null);
 
@@ -96,11 +100,28 @@ export class CoverageStore {
     for (const walk of todo) {
       const { points } = await Tracking.getTrack({ walkId: walk.id });
       const at = walk.endedAt ?? walk.startedAt;
+      const before = cov;
       const segments: RawCoverage['segments'] = { ...cov.segments };
       for (const { id, ratio, mask } of matchWalk(points, streets.segments)) {
         segments[id] = { ...(segments[id] ?? {}), [walk.id]: [ratio, mask] };
       }
       cov = { processedWith, walkIds: [...cov.walkIds, walk.id], walkDates: { ...cov.walkDates, [walk.id]: at }, segments };
+      // Récap de fin de marche : seulement pour une marche qui vient de se terminer
+      // (pas pour les anciennes marches recalculées), et une seule fois.
+      if (Date.now() - at < 24 * 3_600_000 && !(await this.recaps.has(walk.id))) {
+        const index = this.index();
+        if (index) {
+          try {
+            await this.recaps.add(buildRecap({
+              walk, points, before, after: cov, streets, index,
+              quartierOf: await this.loadQuartiers(),
+              walks, history: await this.recaps.history(),
+            }));
+          } catch (e) {
+            console.warn('Récap impossible', e);
+          }
+        }
+      }
       await this.writeFile(cov);
       this.file.set(cov);
       await Tracking.markProcessed({ walkId: walk.id, processedWith }).catch(() => undefined);
@@ -112,6 +133,19 @@ export class CoverageStore {
     await this.running;
     this.file.set(null);
     await Filesystem.deleteFile({ path: COVERAGE_PATH, directory: Directory.Data }).catch(() => undefined);
+  }
+
+  /** Tronçon → petit quartier (pour les quartiers traversés du récap). */
+  private loadQuartiers(): Promise<Map<string, string>> {
+    this.quartierOf ??= fetch('streets/petits-quartiers-troncons.json')
+      .then((r) => (r.ok ? r.json() : { quartiers: {} }))
+      .then((f: { quartiers: Record<string, string[]> }) => {
+        const m = new Map<string, string>();
+        for (const [q, ids] of Object.entries(f.quartiers ?? {})) for (const id of ids) m.set(id, q);
+        return m;
+      })
+      .catch(() => new Map());
+    return this.quartierOf;
   }
 
   private loadStreets(): Promise<Streets> {
