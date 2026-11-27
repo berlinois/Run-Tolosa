@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Même bordeaux que l'écran d'accueil de l'appli (public/splash.svg) -->
+    <color name="splash_background">#7E2A3B</color>
+</resources>

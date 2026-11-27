@@ -35,6 +35,7 @@ Légende : ✅ fait · 🧪 en test · ⏳ prévu · 💡 idée
 - ✅ **Mes données**
   - **Extraire mes marches** : bouton rond ⤓, puis une popup de confirmation. Le zip des traces brutes va dans **Téléchargements** par défaut, ou à un autre emplacement au choix
 - ✅ **Appli**
+  - **Écran d'accueil animé** pendant la localisation. Sur un fond bordeaux s'affichent les 1 942 km de rues de Toulouse, la Garonne, le canal et des monuments dorés (Saint-Sernin, Capitole, Pont-Neuf, la Grave, Cité de l'espace). Une **marche dorée se dessine** jusqu'à Saint-Sernin. L'écran **glisse vers le haut** quand la carte est chargée et centrée sur toi (au plus tard après 6 s). Source : `scripts/build-splash.mjs` → `public/splash.svg`
   - **Logo** : le clocher de Saint-Sernin au bout d'une marche dorée, sur fond rose brique. Icône adaptative et ronde, et écran de démarrage. Source : `design/icon.svg`, régénération : `node scripts/generate-icons.mjs`
   - **Mises à jour en un tap** via Obtainium, à chaque Release produite par la CI
 - 💡 **À venir**

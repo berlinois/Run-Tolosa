@@ -15,6 +15,7 @@ import { Capacitor } from '@capacitor/core';
 import { LngLatBounds, Map as MlMap, Marker, type GeoJSONSource } from 'maplibre-gl';
 import type { Feature, FeatureCollection, MultiLineString, MultiPolygon, Point, Polygon } from 'geojson';
 import { LocationService } from '../core/location.service';
+import { SplashService } from '../core/splash.service';
 import { BASEMAPS, basemapById, overlayInsertionPoint, loadBasemapChoice, saveBasemapChoice, type Basemap, type BasemapId } from './basemaps';
 import { CoverageStore } from '../streets/coverage.store';
 import { DistrictCard } from '../streets/district-card';
@@ -152,6 +153,7 @@ export class MapView implements OnDestroy {
   private readonly location = inject(LocationService);
   private readonly tracking = inject(TrackingStore);
   private readonly injector = inject(Injector);
+  private readonly splash = inject(SplashService);
   private map?: MlMap;
   /** Incrémenté à chaque (re)chargement de style : les calques de l'appli sont alors prêts. */
   private readonly styleReady = signal(0);
@@ -274,10 +276,14 @@ export class MapView implements OnDestroy {
     });
     void this.loadDistricts(map);
     map.on('click', (e) => this.onMapClick(e.point.x, e.point.y));
-    // À l'ouverture : centrer sur ma position (sans message ; Toulouse par défaut si échec).
-    if (Capacitor.isNativePlatform()) {
-      map.once('load', () => void this.locate(true));
-    }
+    // À l'ouverture : centrer sur ma position (sans message ; Toulouse par défaut si échec),
+    // puis faire glisser l'écran d'accueil une fois la carte arrivée à destination.
+    map.once('load', async () => {
+      if (Capacitor.isNativePlatform()) await this.locate(true, false);
+      // Attendre que les tuiles du bon endroit soient dessinées (2 s maximum).
+      await Promise.race([new Promise((r) => map.once('idle', r)), new Promise((r) => setTimeout(r, 2000))]);
+      this.splash.ready();
+    });
   }
 
   protected selectBasemap(id: BasemapId): void {
@@ -596,14 +602,16 @@ export class MapView implements OnDestroy {
     this.statusTimer = setTimeout(() => this.status.set(null), ms);
   }
 
-  protected async locate(silent = false): Promise<void> {
+  protected async locate(silent = false, animate = true): Promise<void> {
     this.locating.set(true);
     if (!silent) this.status.set(null);
     try {
       const { coords } = await this.location.currentPosition();
       const lngLat: [number, number] = [coords.longitude, coords.latitude];
       this.myPosition.set({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: lngLat } });
-      this.map?.flyTo({ center: lngLat, zoom: 16 });
+      // À l'ouverture, pas d'animation : la carte est déjà au bon endroit quand l'accueil glisse.
+      if (animate) this.map?.flyTo({ center: lngLat, zoom: 16 });
+      else this.map?.jumpTo({ center: lngLat, zoom: 16 });
       if (!silent) this.flash(`Précision : ±${Math.round(coords.accuracy)} m`);
     } catch (e) {
       if (!silent) this.flash(`Localisation impossible : ${(e as Error).message}`, 6000);

@@ -188,6 +188,7 @@ android/app/src/main/java/fr/runtolosa/app/tracking/
 scripts/
   extract-streets.mjs      OSM (Overpass) → tronçons             ✅ Phase 2
   generate-icons.mjs       design/icon.svg → icônes Android      ✅
+  build-splash.mjs         données → écran d'accueil (splash.svg) ✅
 ```
 
 ## Feuille de route
