@@ -8,12 +8,13 @@ on:
       what:
         description: "Quoi extraire : tout, rues ou quartiers"
         type: choice
-        options: [tout, rues, quartiers, sonde]
+        options: [tout, rues, quartiers, iris, sonde]
         default: tout
   push:
     paths:
       - scripts/extract-streets.mjs
       - scripts/extract-districts.mjs
+      - scripts/extract-iris.mjs
       - .github/workflows/extract-streets.yml
 
 concurrency:
@@ -42,6 +43,10 @@ jobs:
       - name: Extraction des quartiers
         if: ${{ github.event_name == 'push' || inputs.what == 'tout' || inputs.what == 'quartiers' }}
         run: node scripts/extract-districts.mjs
+
+      - name: Extraction des IRIS (petits quartiers)
+        if: ${{ github.event_name == 'push' || inputs.what == 'tout' || inputs.what == 'iris' }}
+        run: node scripts/extract-iris.mjs
 
       - name: Commit du référentiel
         run: |
