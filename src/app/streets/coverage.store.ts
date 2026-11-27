@@ -12,6 +12,10 @@ export interface SegmentCoverage {
   /** Meilleure couverture atteinte en une seule marche (0 à 1). */
   best: number;
   bestWalkId: string;
+  /** Mètres parcourus lors de la meilleure marche (voir matcher.coveredParts). */
+  mask: string;
+  /** Couverture par marche (marches ayant fait au moins 30 % du tronçon). */
+  walks: Record<string, number>;
   /** Marches ayant parcouru au moins 30 % du tronçon. */
   passages: number;
   firstAt: number;
@@ -71,6 +75,12 @@ export class CoverageStore {
     return out;
   });
 
+  /** Couverture brute et référentiel, pour la sélection d'une rue. */
+  readonly coverageData = computed(() => {
+    const f = this.file();
+    return f && this.segmentsRef ? { streets: this.segmentsRef, segments: f.segments } : null;
+  });
+
   /** Prend en compte les marches terminées pas encore comptées (sérialisé). */
   sync(walks: Walk[]): Promise<void> {
     this.running = this.running.then(() => this.doSync(walks)).catch((e) => {
@@ -97,7 +107,7 @@ export class CoverageStore {
       const { points } = await Tracking.getTrack({ walkId: walk.id });
       const at = walk.endedAt ?? walk.startedAt;
       const segments: Record<string, SegmentCoverage> = { ...cov.segments };
-      for (const { id, ratio } of matchWalk(points, streets.segments)) {
+      for (const { id, ratio, mask } of matchWalk(points, streets.segments)) {
         const prev = segments[id];
         const isBest = !prev || ratio > prev.best;
         const best = isBest ? ratio : prev.best;
@@ -106,6 +116,8 @@ export class CoverageStore {
           status: statusFor(best, streets.byId.get(id)?.lengthM ?? 0) ?? 'pink',
           best,
           bestWalkId: isBest ? walk.id : prev.bestWalkId,
+          mask: isBest ? mask : prev.mask,
+          walks: { ...(prev?.walks ?? {}), [walk.id]: ratio },
           passages: (prev?.passages ?? 0) + passage,
           firstAt: Math.min(prev?.firstAt ?? at, at),
           lastAt: Math.max(prev?.lastAt ?? at, at),

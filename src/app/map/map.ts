@@ -16,6 +16,8 @@ import type { Feature, FeatureCollection, MultiLineString, MultiPolygon, Point, 
 import { LocationService } from '../core/location.service';
 import { BASEMAPS, basemapById, overlayInsertionPoint, loadBasemapChoice, saveBasemapChoice, type Basemap, type BasemapId } from './basemaps';
 import { CoverageStore } from '../streets/coverage.store';
+import { StreetCard } from '../streets/street-card';
+import { indexByName, selectStreet, type StreetSelection } from '../streets/street-selection';
 import { TrackingStore } from '../tracking/tracking.store';
 
 const TOULOUSE_CENTER: [number, number] = [1.4442, 43.6045];
@@ -28,6 +30,7 @@ const LIVE_COLOR = '#1E88E5';
 
 @Component({
   selector: 'app-map',
+  imports: [StreetCard],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div #mapEl class="map"></div>
@@ -79,6 +82,10 @@ const LIVE_COLOR = '#1E88E5';
     <button class="fab locate" type="button" (click)="locate()" [disabled]="locating()" aria-label="Me localiser">
       {{ locating() ? '…' : '📍' }}
     </button>
+
+    @if (selection(); as sel) {
+      <app-street-card [selection]="sel" (closed)="selection.set(null)" />
+    }
 
     @if (status(); as msg) {
       <p class="status">{{ msg }}</p>
@@ -151,6 +158,9 @@ export class MapView implements OnDestroy {
   private districtMarkers: Marker[] = [];
   /** Mode « grands quartiers » (interrupteur en haut à droite). */
   protected readonly districtMode = signal(false);
+  /** Rue sélectionnée par un tap (feature « détail d'une rue »). */
+  protected readonly selection = signal<StreetSelection | null>(null);
+  private byName?: { version: string; index: ReturnType<typeof indexByName> };
 
   protected readonly coverage = inject(CoverageStore);
   protected readonly basemaps = BASEMAPS;
@@ -185,6 +195,16 @@ export class MapView implements OnDestroy {
       const b = this.bigDistricts();
       if (b) this.source('districts-big')?.setData(b);
     });
+    // Rue sélectionnée : halo bleu sur toute la rue, couleur seulement sur les mètres parcourus.
+    effect(() => {
+      if (!this.styleReady()) return;
+      const sel = this.selection();
+      const empty = { type: 'FeatureCollection' as const, features: [] };
+      this.source('selection-halo')?.setData(sel ? sel.halo : empty);
+      this.source('selection-parts')?.setData(sel ? sel.parts : empty);
+      const filter = sel ? (['!', ['in', ['get', 'id'], ['literal', sel.segmentIds]]] as never) : null;
+      for (const id of ['streets', 'streets-casing']) if (this.map?.getLayer(id)) this.map.setFilter(id, filter);
+    });
     // Mode Quartiers : contours plus marqués, zones teintées, tous les noms.
     effect(() => {
       if (!this.styleReady()) return;
@@ -215,6 +235,7 @@ export class MapView implements OnDestroy {
       this.styleReady.update((n) => n + 1);
     });
     void this.loadDistricts(map);
+    map.on('click', (e) => this.onMapClick(e.point.x, e.point.y));
     // À l'ouverture : centrer sur ma position (sans message ; Toulouse par défaut si échec).
     if (Capacitor.isNativePlatform()) {
       map.once('load', () => void this.locate(true));
@@ -280,6 +301,30 @@ export class MapView implements OnDestroy {
           'line-width': width(6),
           'line-opacity': 0.92,
         },
+      },
+      beforeLabels,
+    );
+
+    // Rue sélectionnée : halo bleu (rue entière) puis morceaux parcourus.
+    map.addSource('selection-halo', { type: 'geojson', data: empty });
+    map.addLayer(
+      {
+        id: 'selection-halo',
+        type: 'line',
+        source: 'selection-halo',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#1E88E5', 'line-width': width(18), 'line-opacity': 0.35, 'line-blur': 2 },
+      },
+      beforeLabels,
+    );
+    map.addSource('selection-parts', { type: 'geojson', data: empty });
+    map.addLayer(
+      {
+        id: 'selection-parts',
+        type: 'line',
+        source: 'selection-parts',
+        layout: { 'line-cap': 'butt', 'line-join': 'round' },
+        paint: { 'line-color': ['match', ['get', 'status'], 'gold', STREET_COLOR, PINK_COLOR], 'line-width': width(6) },
       },
       beforeLabels,
     );
@@ -395,6 +440,27 @@ export class MapView implements OnDestroy {
     }
     if (bounds.isEmpty()) bounds.extend([1.35, 43.53]).extend([1.52, 43.67]); // commune de Toulouse, à défaut
     map.fitBounds(bounds, { padding: { top: 64, bottom: 96, left: 8, right: 8 }, bearing: 0, pitch: 0, duration: 900 });
+  }
+
+  /** Tap : une rue rose ou dorée sous le doigt → sélection ; ailleurs → on désélectionne. */
+  private onMapClick(x: number, y: number): void {
+    const map = this.map;
+    const data = this.coverage.coverageData();
+    if (!map || !data || !map.getLayer('streets')) return;
+    const r = 14; // zone de tap élargie autour du trait
+    const box: [[number, number], [number, number]] = [[x - r, y - r], [x + r, y + r]];
+    // Tap sur la rue déjà sélectionnée : on la garde.
+    if (this.selection() && map.queryRenderedFeatures(box, { layers: ['selection-halo'] }).length) return;
+    const hit = map.queryRenderedFeatures(box, { layers: ['streets'] })[0];
+    const id = hit?.properties?.['id'] as string | undefined;
+    if (!id) {
+      this.selection.set(null);
+      return;
+    }
+    if (this.byName?.version !== data.streets.version) {
+      this.byName = { version: data.streets.version, index: indexByName(data.streets) };
+    }
+    this.selection.set(selectStreet(id, data.streets, this.byName.index, data.segments));
   }
 
   protected km(value: number): string {

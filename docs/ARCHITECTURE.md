@@ -91,6 +91,8 @@ recalculé quand une marche est supprimée.
 | `segmentId` | `"w12345:3"` | Lien vers le tronçon |
 | `status` | `"gold"` / `"pink"` | Doré (validé) ou rose (parcouru), selon la meilleure marche : c'est la couleur |
 | `best`, `bestWalkId` | `0.94`, `"2026-11-27T07-12-05"` | Meilleure couverture en une marche, et cette marche |
+| `mask` | `"111111000"` | Mètres parcourus lors de la meilleure marche (un caractère tous les ~4 m), pour dessiner les parties faites |
+| `walks` | `{ "2026-11-27T07-12-05": 0.94 }` | Couverture du tronçon par chaque marche, pour les stats d'une rue |
 | `passages` | `4` | Nombre de marches qui ont fait au moins 30 % du tronçon |
 | `firstAt` / `lastAt` | ms epoch | Couleur selon l'ancienneté, date de découverte |
 | `lastWalkId` | `"2026-11-27T07-12-05"` | Dernière marche |
@@ -162,6 +164,8 @@ src/app/
     streets.ts             format du référentiel des tronçons    ✅ Phase 2
     matcher.ts             points GPS → tronçons validés         ✅ Phase 2
     coverage.store.ts      coverage.json, rues dorées, stats     ✅ Phase 2
+    street-selection.ts    rue entière, stats, parties faites    ✅
+    street-card.ts         carte « détail d'une rue »            ✅
   map/map.ts               carte MapLibre + calques de l'appli   ✅
   map/basemaps.ts          fonds : OpenFreeMap + IGN (WMTS)      ✅
   tracking/

@@ -1,5 +1,5 @@
 import type { TrackPoint } from '../tracking/model';
-import { matchWalk, statusFor } from './matcher';
+import { coveredParts, matchWalk, statusFor } from './matcher';
 import type { StreetSegment } from './streets';
 
 // ~1 m ≈ 0.000009° de latitude à Toulouse ; ~0.0000124° de longitude.
@@ -84,5 +84,16 @@ describe('matchWalk', () => {
   it('comble les petits trous de la trace', () => {
     const pts = walk(0, 100).filter((_, i) => i % 15 === 0); // un point tous les ~22 m
     expect(statusOf(pts, seg('a', 100))).toBe('gold');
+  });
+
+  it('garde le masque des mètres parcourus et sait redessiner ces morceaux', () => {
+    const s = seg('a', 100);
+    const m = matchWalk(walk(0, 50), [s])[0];
+    expect(m.mask).toMatch(/^1+0+$/); // début parcouru, fin non parcourue
+    const parts = coveredParts(s.coords, m.mask);
+    expect(parts).toHaveLength(1);
+    const endM = (parts[0].at(-1)![0] - LON0) / DLON;
+    expect(endM).toBeGreaterThan(48);
+    expect(endM).toBeLessThan(60);
   });
 });

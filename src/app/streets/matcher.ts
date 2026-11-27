@@ -10,7 +10,7 @@ import type { StreetSegment } from './streets';
  *           (marge plus large pour les petites rues, plus stricte pour les longues).
  * Changer un paramètre = changer MATCHER_ID : tout est recalculé depuis les traces.
  */
-export const MATCHER_ID = 'matcher-v2';
+export const MATCHER_ID = 'matcher-v3';
 export const MAX_POINT_ACCURACY_M = 25;
 export const MATCH_RADIUS_M = 12;
 export const PINK_MIN_RATIO = 0.3;
@@ -35,6 +35,8 @@ export interface SegmentMatch {
   id: string;
   /** Part de la longueur parcourue, de 0 à 1. */
   ratio: number;
+  /** Échantillons parcourus le long du tronçon ('1') ou non ('0'), tous les ~4 m. */
+  mask: string;
 }
 /** Pas d'échantillonnage le long des tronçons. */
 const SAMPLE_STEP_M = 4;
@@ -130,29 +132,67 @@ export function matchWalk(points: readonly TrackPoint[], segments: readonly Stre
   for (const s of segments) {
     const [a, b, c, d] = s.bbox;
     if (c < minLon - mLon || a > maxLon + mLon || d < minLat - mLat || b > maxLat + mLat) continue;
-    const ratio = coveredRatio(s, proj, grid);
-    if (statusFor(ratio, s.lengthM)) matched.push({ id: s.id, ratio: Math.round(ratio * 1000) / 1000 });
+    const { ratio, mask } = coverage(s, proj, grid);
+    if (statusFor(ratio, s.lengthM)) matched.push({ id: s.id, ratio: Math.round(ratio * 1000) / 1000, mask });
   }
   return matched;
 }
 
+/** Projection de référence (fixe) pour que l'échantillonnage d'un tronçon soit toujours le même. */
+const REF = new LocalProjection(43.6);
+
+/** Nombre d'échantillons sur chaque portion [i, i+1] du tracé (0 si portion de longueur nulle). */
+export function sampleCounts(coords: readonly [number, number][]): number[] {
+  const counts: number[] = [];
+  for (let i = 1; i < coords.length; i++) {
+    const len = Math.hypot(REF.x(coords[i][0]) - REF.x(coords[i - 1][0]), REF.y(coords[i][1]) - REF.y(coords[i - 1][1]));
+    counts.push(len === 0 ? 0 : Math.max(1, Math.round(len / SAMPLE_STEP_M)));
+  }
+  return counts;
+}
+
+/** Morceaux du tronçon réellement parcourus, d'après le masque d'échantillons. */
+export function coveredParts(coords: readonly [number, number][], mask: string): [number, number][][] {
+  const counts = sampleCounts(coords);
+  const parts: [number, number][][] = [];
+  let current: [number, number][] | null = null;
+  let m = 0;
+  for (let i = 1; i < coords.length; i++) {
+    const n = counts[i - 1];
+    const [a, b] = [coords[i - 1], coords[i]];
+    const at = (t: number): [number, number] => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    for (let k = 0; k < n; k++, m++) {
+      if (mask[m] === '1') {
+        if (!current) { current = [at(k / n)]; parts.push(current); }
+        current.push(at((k + 1) / n));
+      } else {
+        current = null;
+      }
+    }
+  }
+  return parts;
+}
+
 /** Part de la longueur du tronçon à moins de MATCH_RADIUS_M de la trace. */
-function coveredRatio(s: StreetSegment, proj: LocalProjection, grid: PointGrid): number {
-  let total = 0, covered = 0;
+function coverage(s: StreetSegment, proj: LocalProjection, grid: PointGrid): { ratio: number; mask: string } {
+  let total = 0, covered = 0, mask = '';
+  const counts = sampleCounts(s.coords);
   for (let i = 1; i < s.coords.length; i++) {
     const [lon0, lat0] = s.coords[i - 1], [lon1, lat1] = s.coords[i];
     const x0 = proj.x(lon0), y0 = proj.y(lat0), x1 = proj.x(lon1), y1 = proj.y(lat1);
     const len = Math.hypot(x1 - x0, y1 - y0);
-    if (len === 0) continue;
+    const n = counts[i - 1];
+    if (len === 0 || n === 0) continue;
     const ux = (x1 - x0) / len, uy = (y1 - y0) / len;
-    const n = Math.max(1, Math.round(len / SAMPLE_STEP_M));
     // Échantillons au milieu de chaque pas, chacun pèse len / n.
     for (let k = 0; k < n; k++) {
       const t = (k + 0.5) / n;
       const x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t;
-      if (grid.hasNear(x, y, ux, uy, MATCH_RADIUS_M, ALONG_TOLERANCE_M)) covered += len / n;
+      const hit = grid.hasNear(x, y, ux, uy, MATCH_RADIUS_M, ALONG_TOLERANCE_M);
+      if (hit) covered += len / n;
+      mask += hit ? '1' : '0';
     }
     total += len;
   }
-  return total > 0 ? covered / total : 0;
+  return { ratio: total > 0 ? covered / total : 0, mask };
 }
