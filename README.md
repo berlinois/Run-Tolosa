@@ -22,6 +22,7 @@ de serveur, pas de compte, pas d'abonnement. **Coût : 0 €.**
 | **Rues parcourues** | Les tronçons OSM de la commune de Toulouse validés par tes marches (au moins 60 % du tronçon parcouru) sont tracés en **doré épais**. Le doré passe sous les noms de rues, qui restent lisibles. Les rues jamais parcourues n'ont pas de trait, et la trace GPS des marches terminées n'est pas affichée. Bords de Garonne et canal du Midi compris | ✅ |
 | **Total parcouru** | Dans la légende : km de rues validées et nombre de tronçons | ✅ |
 | **Quartiers (test)** | **104 petits quartiers** (Guilheméry, Bonhoure, Côte Pavée…) en pointillés rose brique, avec leur nom à partir du zoom 13,5. Les **20 grands quartiers** sont en trait épais discret. Les contours viennent des IRIS (INSEE/IGN), avec les noms de quartiers OSM : un nom de rue est remplacé par le quartier qui se trouve dans la zone, ou le plus proche (`scripts/build-neighbourhoods.mjs`) | 🧪 |
+| **Mode Quartiers (debug)** | Pilule « 🗺 Quartiers » en haut à droite. Elle cadre tout Toulouse, teinte chaque petit quartier et affiche tous les noms. Un 2e tap revient à la vue d'avant | 🧪 |
 | **Stats par quartier** | % de rues parcourues pour chaque quartier de Toulouse, en plus du % global | 💡 Idée |
 | **Carte interactive des quartiers** | Un tap sur un quartier zoome dessus et affiche ses rues faites et pas faites | 💡 Idée |
 | **Parcs** | Plus de 50 % des chemins d'un parc parcourus : le parc entier est validé, avec une couleur dédiée | 💡 Idée |

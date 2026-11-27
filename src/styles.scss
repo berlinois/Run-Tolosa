@@ -17,3 +17,11 @@ html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
   pointer-events: none;
 }
 .district-labels-hidden .district-label { display: none; }
+
+/* Mode Quartiers : tous les noms, en plus petit. */
+.district-mode .district-label {
+  max-width: 76px;
+  padding: 1px 4px;
+  font-size: 9px;
+  border-radius: 5px;
+}
