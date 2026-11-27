@@ -9,7 +9,7 @@ de serveur, pas de compte, pas d'abonnement. **Coût : 0 €.**
 | Feature | Description | État |
 |---|---|---|
 | **Carte de Toulouse** | Fond de carte OpenFreeMap affiché avec MapLibre, sans clé d'API | ✅ |
-| **Me localiser** | Bouton rond 📍 : position actuelle, et précision du GPS affichée 4 s | ✅ |
+| **Me localiser** | À l'ouverture, la carte se centre automatiquement sur ta position. Bouton rond 📍 : position actuelle, et précision du GPS affichée 4 s | ✅ |
 | **Fonds de carte** | Bouton rond « calques », puis un panneau : **Clair** (par défaut), **Plan**, **Sombre** (OpenFreeMap), **Plan IGN**, **Photo aérienne** (IGN Géoplateforme). Tous gratuits et sans clé, le choix est retenu | ✅ |
 | **Enregistrer une marche** | Bouton « Démarrer / Arrêter ». Le GPS est lu toutes les 2 s, **même écran éteint**, avec une notification qui affiche la distance et un bouton Arrêter | ✅ |
 | **Marche trop courte** | À l'arrêt d'une marche de moins de 5 min, une popup « Marche trop courte » s'affiche. **Supprimer** (rouge) efface définitivement la marche, **Sauvegarder quand même** la garde | ✅ |

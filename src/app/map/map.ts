@@ -174,6 +174,10 @@ export class MapView implements OnDestroy {
       this.addOverlays(map);
       this.styleReady.update((n) => n + 1);
     });
+    // À l'ouverture : centrer sur ma position (sans message ; Toulouse par défaut si échec).
+    if (Capacitor.isNativePlatform()) {
+      map.once('load', () => void this.locate(true));
+    }
   }
 
   protected selectBasemap(id: BasemapId): void {
@@ -249,17 +253,17 @@ export class MapView implements OnDestroy {
     this.statusTimer = setTimeout(() => this.status.set(null), ms);
   }
 
-  protected async locate(): Promise<void> {
+  protected async locate(silent = false): Promise<void> {
     this.locating.set(true);
-    this.status.set(null);
+    if (!silent) this.status.set(null);
     try {
       const { coords } = await this.location.currentPosition();
       const lngLat: [number, number] = [coords.longitude, coords.latitude];
       this.myPosition.set({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: lngLat } });
       this.map?.flyTo({ center: lngLat, zoom: 16 });
-      this.flash(`Précision : ±${Math.round(coords.accuracy)} m`);
+      if (!silent) this.flash(`Précision : ±${Math.round(coords.accuracy)} m`);
     } catch (e) {
-      this.flash(`Localisation impossible : ${(e as Error).message}`, 6000);
+      if (!silent) this.flash(`Localisation impossible : ${(e as Error).message}`, 6000);
     } finally {
       this.locating.set(false);
     }
