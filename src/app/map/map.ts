@@ -15,6 +15,7 @@ import { Capacitor } from '@capacitor/core';
 import { LngLatBounds, Map as MlMap, Marker, type GeoJSONSource } from 'maplibre-gl';
 import type { Feature, FeatureCollection, MultiLineString, MultiPolygon, Point, Polygon } from 'geojson';
 import { LocationService } from '../core/location.service';
+import type { Position } from '@capacitor/geolocation';
 import { SplashService } from '../core/splash.service';
 import { BASEMAPS, basemapById, overlayInsertionPoint, loadBasemapChoice, saveBasemapChoice, type Basemap, type BasemapId } from './basemaps';
 import { CoverageStore } from '../streets/coverage.store';
@@ -154,6 +155,8 @@ export class MapView implements OnDestroy {
   private readonly tracking = inject(TrackingStore);
   private readonly injector = inject(Injector);
   private readonly splash = inject(SplashService);
+  /** Position demandée dès le lancement (le GPS travaille pendant l'animation d'accueil). */
+  private firstPosition: Promise<Position | null> = Promise.resolve(null);
   private map?: MlMap;
   /** Incrémenté à chaque (re)chargement de style : les calques de l'appli sont alors prêts. */
   private readonly styleReady = signal(0);
@@ -187,8 +190,15 @@ export class MapView implements OnDestroy {
   protected readonly version = signal<string | null>(null);
 
   constructor() {
-    afterNextRender(() => this.initMap());
-    this.tracking.init();
+    // Démarrage ordonné : le GPS (hors de l'appli, sans coût) tout de suite ; la carte et
+    // les données seulement après l'animation d'accueil, pour qu'elle reste fluide.
+    this.firstPosition = Capacitor.isNativePlatform() ? this.location.currentPosition().catch(() => null) : Promise.resolve(null);
+    afterNextRender(() => {
+      void this.splash.animationDone.then(() => {
+        this.initMap();
+        this.tracking.init();
+      });
+    });
     if (Capacitor.isNativePlatform()) {
       void App.getInfo().then((info) => this.version.set(info.version));
     }
@@ -279,7 +289,12 @@ export class MapView implements OnDestroy {
     // À l'ouverture : centrer sur ma position (sans message ; Toulouse par défaut si échec),
     // puis faire glisser l'écran d'accueil une fois la carte arrivée à destination.
     map.once('load', async () => {
-      if (Capacitor.isNativePlatform()) await this.locate(true, false);
+      const pos = await this.firstPosition;
+      if (pos) {
+        const lngLat: [number, number] = [pos.coords.longitude, pos.coords.latitude];
+        this.myPosition.set({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: lngLat } });
+        map.jumpTo({ center: lngLat, zoom: 16 });
+      }
       // Attendre que les tuiles du bon endroit soient dessinées (2 s maximum).
       await Promise.race([new Promise((r) => map.once('idle', r)), new Promise((r) => setTimeout(r, 2000))]);
       this.splash.ready();

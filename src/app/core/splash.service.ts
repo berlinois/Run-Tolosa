@@ -1,9 +1,13 @@
 import { Injectable } from '@angular/core';
 
-/** Durée minimale d'affichage : laisser la marche dorée se dessiner. */
-const MIN_MS = 3200;
-/** Au-delà, on bascule sur la carte même sans position (GPS lent, refus…). */
-const MAX_MS = 6000;
+/**
+ * Durée de l'animation d'accueil (marche dorée + monuments). Pendant ce temps,
+ * l'appli ne lance AUCUN travail lourd (carte, lecture des rues, couverture) :
+ * sur téléphone, ces tâches bloquaient l'animation jusqu'à une seconde.
+ */
+const ANIMATION_MS = 3400;
+/** Au-delà, on bascule sur la carte même si elle n'est pas prête (GPS lent, refus…). */
+const MAX_MS = 9000;
 
 /**
  * Écran d'accueil (div #splash de index.html, image public/splash.svg).
@@ -11,8 +15,13 @@ const MAX_MS = 6000;
  */
 @Injectable({ providedIn: 'root' })
 export class SplashService {
-  private readonly start = performance.now();
   private done = false;
+  private readonly present = !!document.getElementById('splash');
+
+  /** Résolue quand l'animation est terminée : le travail lourd peut commencer. */
+  readonly animationDone: Promise<void> = new Promise((resolve) =>
+    setTimeout(resolve, this.present ? ANIMATION_MS : 0),
+  );
 
   constructor() {
     setTimeout(() => this.hide(), MAX_MS);
@@ -20,8 +29,7 @@ export class SplashService {
 
   /** La carte est chargée et (si possible) centrée sur la position. */
   ready(): void {
-    const wait = Math.max(0, MIN_MS - (performance.now() - this.start));
-    setTimeout(() => this.hide(), wait);
+    void this.animationDone.then(() => this.hide());
   }
 
   private hide(): void {

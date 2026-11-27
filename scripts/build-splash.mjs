@@ -131,7 +131,7 @@ let mon = '';
 MONUMENTS.forEach(([id, lo, la, name], i) => {
   const [x, y] = P(lo, la);
   const [dx, dy] = NUDGE[id];
-  mon += `<g class="mon" style="animation-delay:${(0.5 + i * 0.25).toFixed(2)}s" transform="translate(${(x + dx).toFixed(1)} ${(y + dy).toFixed(1)})">` +
+  mon += `<g class="mon" style="animation-delay:${(0.9 + i * 0.25).toFixed(2)}s" transform="translate(${(x + dx).toFixed(1)} ${(y + dy).toFixed(1)})">` +
     `<g class="ico" transform="scale(1.35)">${ICONS[id]}</g><text y="16">${name.toUpperCase()}</text></g>`;
 });
 
@@ -148,17 +148,16 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" pre
   <filter id="glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2.2"/></filter>
   <style>
     text { font-family: system-ui, -apple-system, sans-serif; }
-    .net { animation: fade 1.4s ease-out both; }
-    .walk, .walk-glow { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 2.4s .4s cubic-bezier(.45,.05,.35,1) forwards; }
+    .net { animation: fade 1.2s .4s ease-out both; }
+    .walk, .walk-glow { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 2.3s .7s cubic-bezier(.45,.05,.35,1) forwards; }
     .mon { opacity: 0; animation: fade .7s ease-out both; }
     .ico { fill: none; stroke: #F7C64F; stroke-width: .85; stroke-linecap: round; stroke-linejoin: round; }
     .mon text { fill: #FFE9A8; font-size: 7.5px; font-weight: 500; letter-spacing: .14em; text-anchor: middle; opacity: .85; }
-    .dot { opacity: 0; animation: fade .3s 2.8s forwards; }
-    .pulse { opacity: 0; transform-box: fill-box; transform-origin: center; animation: pulse 1.6s 2.8s ease-out infinite; }
+    .dot { opacity: 0; animation: fade .3s 3s forwards; }
+    .pulse { opacity: 0; animation: fade .5s 3s forwards; }
     .title { animation: fade 1s ease-out both; }
     @keyframes draw { to { stroke-dashoffset: 0; } }
     @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes pulse { 0% { opacity: .8; transform: scale(1); } 100% { opacity: 0; transform: scale(3.2); } }
   </style>
 </defs>
 <rect width="${W}" height="${H}" fill="url(#gc)"/>
@@ -170,7 +169,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" pre
 </g>
 <path class="walk-glow" pathLength="1" d="${walk}" stroke="#F7C64F" stroke-opacity=".55" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
 <path class="walk" pathLength="1" d="${walk}" stroke="#FFD66B" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-<circle class="pulse" cx="${end[0].toFixed(1)}" cy="${end[1].toFixed(1)}" r="3" fill="none" stroke="#FFD66B" stroke-width="1"/>
+<circle class="pulse" cx="${end[0].toFixed(1)}" cy="${end[1].toFixed(1)}" r="6" fill="#FFD66B" fill-opacity=".25"/>
 <circle class="dot" cx="${end[0].toFixed(1)}" cy="${end[1].toFixed(1)}" r="2.6" fill="#FFD66B"/>
 ${mon}
 <rect width="${W}" height="${H}" fill="url(#fade)"/>
