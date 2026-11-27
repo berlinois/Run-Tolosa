@@ -299,7 +299,8 @@ export class MapView implements OnDestroy {
 
     const mode = this.districtMode();
     const vis = (on: boolean) => (on ? 'visible' : 'none') as 'visible' | 'none';
-    const pink = dark ? '#F48FB1' : '#B8505E';
+    // Frontières : bordeaux très foncé (contraste avec les rues roses et dorées) ; rose clair sur fond sombre.
+    const border = dark ? '#F8BBD0' : '#4A1420';
 
     // Grands quartiers (mode « Quartiers ») : zones teintées, sous les rues dorées.
     map.addSource('districts-big', { type: 'geojson', data: empty });
@@ -378,12 +379,12 @@ export class MapView implements OnDestroy {
         beforeLabels,
       );
       map.addLayer(
-        { id, type: 'line', source, layout: { visibility: vis(on) }, paint: { 'line-color': pink, 'line-width': w, 'line-dasharray': [3, 2] } },
+        { id, type: 'line', source, layout: { visibility: vis(on) }, paint: { 'line-color': border, 'line-width': w, 'line-dasharray': [3, 2] } },
         beforeLabels,
       );
     };
-    dashed('districts', 'districts', !mode, 1.8);
-    dashed('districts-big', 'districts-big-lines', mode, 2.6);
+    dashed('districts', 'districts', !mode, 2.2);
+    dashed('districts-big', 'districts-big-lines', mode, 2.8);
     map.addSource('district-selection', { type: 'geojson', data: empty });
     map.addLayer(
       {
