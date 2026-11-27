@@ -163,6 +163,9 @@ export class MapView implements OnDestroy {
   private readonly smallBorders = signal<FeatureCollection<MultiLineString> | null>(null);
   private readonly bigBorders = signal<FeatureCollection<MultiLineString> | null>(null);
   private districtMarkers: Marker[] = [];
+  /** Mini-barres des étiquettes de quartiers, mises à jour quand la couverture change. */
+  private labelBars: { name: string; kind: DistrictKind; feature: Feature; gold: HTMLElement; pink: HTMLElement }[] = [];
+  private readonly labelsReady = signal(false);
   /** Mode « grands quartiers » (interrupteur en haut à droite). */
   protected readonly districtMode = signal(false);
   /** Rue sélectionnée par un tap (feature « détail d'une rue »). */
@@ -215,6 +218,24 @@ export class MapView implements OnDestroy {
       this.source('selection-parts')?.setData(sel ? sel.parts : empty);
       const filter = sel ? (['!', ['in', ['get', 'id'], ['literal', sel.segmentIds]]] as never) : null;
       for (const id of ['streets', 'streets-casing']) if (this.map?.getLayer(id)) this.map.setFilter(id, filter);
+    });
+    // Avancement de chaque quartier dans sa mini-barre (recalculé à chaque nouvelle marche).
+    effect(() => {
+      const ctx = this.coverage.context();
+      if (!this.labelsReady() || !ctx) return;
+      const bigIds = new Map<string, string[]>();
+      for (const s of ctx.streets.segments) {
+        if (s.district) (bigIds.get(s.district) ?? bigIds.set(s.district, []).get(s.district)!).push(s.id);
+      }
+      for (const l of this.labelBars) {
+        const ids = l.kind === 'small' ? this.smallSegments?.[l.name] ?? [] : bigIds.get(l.name) ?? [];
+        const st = districtStats(l.name, l.kind, ids, ctx);
+        const pct = (m: number) => (st.totalM > 0 ? Math.max(0, (m / st.totalM) * 100) : 0);
+        // Un minimum visible dès qu'on a commencé, sinon 0,5 % ne se verrait pas.
+        const shown = (v: number) => (v > 0 ? Math.max(v, 4) : 0);
+        l.gold.style.width = `${shown(pct(st.goldM))}%`;
+        l.pink.style.width = `${shown(pct(st.doneM - st.goldM))}%`;
+      }
     });
     // Quartier sélectionné : contour en halo bleu.
     effect(() => {
@@ -425,7 +446,17 @@ export class MapView implements OnDestroy {
         const el = document.createElement('div');
         el.className = `district-label ${kind}`;
         const name = String(f.properties?.['name'] ?? '');
-        el.textContent = name;
+        // Nom + mini-barre de progression (doré = validé, rose = parcouru).
+        const nm = document.createElement('span');
+        nm.className = 'nm';
+        nm.textContent = name;
+        const bar = document.createElement('span');
+        bar.className = 'mini';
+        const gold = document.createElement('i');
+        const pink = document.createElement('b');
+        bar.append(gold, pink);
+        el.append(nm, bar);
+        this.labelBars.push({ name, kind, feature: f, gold, pink });
         // Tap sur le nom → stats du quartier (le tap ne descend pas jusqu'à la carte).
         el.addEventListener('click', (ev) => {
           ev.stopPropagation();
@@ -440,6 +471,7 @@ export class MapView implements OnDestroy {
       ];
       map.on('zoom', () => this.updateDistrictLabels());
       this.updateDistrictLabels();
+      this.labelsReady.set(true);
     } catch {
       // affichage de test : sans contours, la carte fonctionne normalement
     }

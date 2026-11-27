@@ -2,21 +2,33 @@
 
 html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
 
-/* Noms des quartiers (marqueurs MapLibre, hors composant). */
+/* Noms des quartiers (marqueurs MapLibre, hors composant) :
+   étiquette pleine rose brique + mini-barre d'avancement (doré validé, rose parcouru). */
 .district-label {
-  max-width: 120px;
-  padding: 3px 7px;
-  border-radius: 8px;
-  background: #fffd;
-  color: #8e3646;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.25;
+  max-width: 140px;
+  padding: 4px 10px 5px;
+  border-radius: 12px;
+  background: #B8505E;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
   text-align: center;
-  box-shadow: 0 1px 3px #0003;
+  box-shadow: 0 2px 5px #0004;
   cursor: pointer; /* tap sur le nom → stats du quartier */
 }
-.district-label.big { display: none; font-size: 10px; max-width: 96px; color: #6d2533; }
+.district-label .nm { display: block; }
+.district-label .mini {
+  display: flex;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: #ffffff59;
+}
+.district-label .mini i { background: #F2B705; }
+.district-label .mini b { background: #FFB3CF; }
+.district-label.big { display: none; font-size: 11px; max-width: 120px; padding: 4px 8px 5px; }
 .district-labels-hidden .district-label.small { display: none; }
 /* Mode Quartiers : seuls les 20 grands quartiers sont nommés. */
 .district-mode .district-label.small { display: none; }
