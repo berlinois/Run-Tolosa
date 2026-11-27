@@ -8,7 +8,7 @@ on:
       what:
         description: "Quoi extraire : tout, rues ou quartiers"
         type: choice
-        options: [tout, rues, quartiers]
+        options: [tout, rues, quartiers, sonde]
         default: tout
   push:
     paths:
@@ -31,12 +31,16 @@ jobs:
         with:
           node-version: 22
 
+      - name: Sonde des découpages de quartiers (lecture seule)
+        if: ${{ inputs.what == 'sonde' }}
+        run: node scripts/probe-neighbourhoods.mjs
+
       - name: Extraction des rues
-        if: ${{ github.event_name == 'push' || inputs.what != 'quartiers' }}
+        if: ${{ github.event_name == 'push' || inputs.what == 'tout' || inputs.what == 'rues' }}
         run: node scripts/extract-streets.mjs
 
       - name: Extraction des quartiers
-        if: ${{ github.event_name == 'push' || inputs.what != 'rues' }}
+        if: ${{ github.event_name == 'push' || inputs.what == 'tout' || inputs.what == 'quartiers' }}
         run: node scripts/extract-districts.mjs
 
       - name: Commit du référentiel
