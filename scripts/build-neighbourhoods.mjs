@@ -182,3 +182,63 @@ writeFileSync('public/streets/grands-quartiers.geojson', JSON.stringify({
   features: bigFeatures,
 }));
 console.log(`${bigFeatures.length} grands quartiers (${bigFeatures.filter((f) => f.geometry.type === 'Polygon').length} d'un seul tenant)`);
+
+// ---- Réseaux de frontières pour l'affichage en pointillés.
+// Chaque frontière entre deux zones voisines n'y figure qu'UNE fois (sinon deux
+// pointillés décalés se superposent et ressemblent à un trait plein), et les
+// arêtes sont chaînées en longues lignes pour un motif régulier.
+function borderNetwork(ringsList) {
+  const k = (p) => `${p[0]},${p[1]}`;
+  const coord = new Map();
+  const adj = new Map(); // nœud → nœuds voisins (arêtes uniques)
+  const link = (a, b) => {
+    const ka = k(a), kb = k(b);
+    if (ka === kb) return;
+    coord.set(ka, a); coord.set(kb, b);
+    (adj.get(ka) ?? adj.set(ka, new Set()).get(ka)).add(kb);
+    (adj.get(kb) ?? adj.set(kb, new Set()).get(kb)).add(ka);
+  };
+  for (const r of ringsList) for (let i = 1; i < r.length; i++) link(r[i - 1], r[i]);
+  const used = new Set();
+  const ek = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  const lines = [];
+  const walk = (start, next) => {
+    const line = [coord.get(start)];
+    let prev = start, cur = next;
+    used.add(ek(prev, cur));
+    line.push(coord.get(cur));
+    while (adj.get(cur).size === 2) {
+      const n = [...adj.get(cur)].find((x) => x !== prev && !used.has(ek(cur, x)));
+      if (!n) break;
+      used.add(ek(cur, n));
+      prev = cur; cur = n;
+      line.push(coord.get(cur));
+    }
+    lines.push(line);
+  };
+  // D'abord depuis les extrémités et carrefours, puis les boucles restantes.
+  for (const [n, set] of adj) if (set.size !== 2) for (const m of set) if (!used.has(ek(n, m))) walk(n, m);
+  for (const [n, set] of adj) for (const m of set) if (!used.has(ek(n, m))) walk(n, m);
+  return { type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: lines } };
+}
+
+// Petits quartiers : arêtes IRIS sauf celles internes à un même quartier.
+const smallRings = [];
+for (const f of iris.features) for (const r of rings(f.geometry)) {
+  let run = [];
+  for (let i = 1; i < r.length; i++) {
+    const owners = edgeOwners.get(key(r[i - 1], r[i]));
+    if (owners.length > 1 && owners.every((o) => o === owners[0])) { if (run.length > 1) smallRings.push(run); run = []; continue; }
+    if (run.length === 0) run.push(r[i - 1]);
+    run.push(r[i]);
+  }
+  if (run.length > 1) smallRings.push(run);
+}
+const contours = (name, ringsList) => {
+  const net = borderNetwork(ringsList);
+  writeFileSync(`public/streets/${name}`, JSON.stringify({ type: 'FeatureCollection', features: [net] }));
+  console.log(`${name} : ${net.geometry.coordinates.length} lignes`);
+};
+contours('petits-quartiers-contours.geojson', smallRings);
+contours('grands-quartiers-contours.geojson', bigFeatures.flatMap((f) =>
+  f.geometry.type === 'Polygon' ? f.geometry.coordinates : f.geometry.coordinates.flat()));

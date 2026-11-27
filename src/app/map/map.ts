@@ -138,7 +138,9 @@ export class MapView implements OnDestroy {
   private statusTimer?: ReturnType<typeof setTimeout>;
   /** Grands quartiers (20) et petits quartiers (IRIS renommés), affichage de test. */
   private readonly bigDistricts = signal<FeatureCollection<Polygon | MultiPolygon> | null>(null);
-  private readonly districts = signal<FeatureCollection<MultiLineString> | null>(null);
+  /** Réseaux de frontières (chaque frontière une seule fois, pour des pointillés réguliers). */
+  private readonly smallBorders = signal<FeatureCollection<MultiLineString> | null>(null);
+  private readonly bigBorders = signal<FeatureCollection<MultiLineString> | null>(null);
   private districtMarkers: Marker[] = [];
   /** Mode « grands quartiers » (interrupteur en haut à droite). */
   protected readonly districtMode = signal(false);
@@ -169,8 +171,10 @@ export class MapView implements OnDestroy {
     });
     effect(() => {
       if (!this.styleReady()) return;
-      const d = this.districts();
+      const d = this.smallBorders();
       if (d) this.source('districts')?.setData(d);
+      const bb = this.bigBorders();
+      if (bb) this.source('districts-big-lines')?.setData(bb);
       const b = this.bigDistricts();
       if (b) this.source('districts-big')?.setData(b);
     });
@@ -268,6 +272,7 @@ export class MapView implements OnDestroy {
     // Contours des quartiers au-dessus des rues dorées (sinon le doré les cache).
     // Tous les contours en pointillés : petits quartiers par défaut, grands en mode « Quartiers ».
     map.addSource('districts', { type: 'geojson', data: empty });
+    map.addSource('districts-big-lines', { type: 'geojson', data: empty });
     const dashed = (id: string, source: string, on: boolean, w: number) => {
       map.addLayer(
         { id: `${id}-halo`, type: 'line', source, layout: { visibility: vis(on) }, paint: { 'line-color': '#ffffff', 'line-width': w + 3, 'line-opacity': dark ? 0.15 : 0.6 } },
@@ -279,7 +284,7 @@ export class MapView implements OnDestroy {
       );
     };
     dashed('districts', 'districts', !mode, 1.8);
-    dashed('districts-big', 'districts-big', mode, 2.6);
+    dashed('districts-big', 'districts-big-lines', mode, 2.6);
 
     map.addSource('live', { type: 'geojson', data: empty });
     map.addLayer({
@@ -306,13 +311,22 @@ export class MapView implements OnDestroy {
 
   private async loadDistricts(map: MlMap): Promise<void> {
     try {
-      const [big, small] = (await Promise.all(
-        ['streets/grands-quartiers.geojson', 'streets/petits-quartiers.geojson'].map((url) =>
-          fetch(url).then((r) => (r.ok ? r.json() : null)),
-        ),
-      )) as [FeatureCollection<Polygon | MultiPolygon> | null, FeatureCollection<MultiLineString> | null];
+      const [big, small, smallBorders, bigBorders] = (await Promise.all(
+        [
+          'streets/grands-quartiers.geojson',
+          'streets/petits-quartiers.geojson',
+          'streets/petits-quartiers-contours.geojson',
+          'streets/grands-quartiers-contours.geojson',
+        ].map((url) => fetch(url).then((r) => (r.ok ? r.json() : null))),
+      )) as [
+        FeatureCollection<Polygon | MultiPolygon> | null,
+        FeatureCollection<MultiLineString> | null,
+        FeatureCollection<MultiLineString> | null,
+        FeatureCollection<MultiLineString> | null,
+      ];
       if (big) this.bigDistricts.set(withColors(big));
-      if (small) this.districts.set(small);
+      if (smallBorders) this.smallBorders.set(smallBorders);
+      if (bigBorders) this.bigBorders.set(bigBorders);
       // Noms : marqueurs HTML (indépendants des polices du fond de carte), au centre visuel.
       const label = (f: Feature, kind: 'small' | 'big') => {
         const el = document.createElement('div');
