@@ -137,13 +137,10 @@ export class MapView implements OnDestroy {
   private readonly myPosition = signal<Feature<Point> | null>(null);
   private statusTimer?: ReturnType<typeof setTimeout>;
   /** Grands quartiers (20) et petits quartiers (IRIS renommés), affichage de test. */
-  private readonly bigDistricts = signal<FeatureCollection<MultiLineString> | null>(null);
+  private readonly bigDistricts = signal<FeatureCollection<Polygon | MultiPolygon> | null>(null);
   private readonly districts = signal<FeatureCollection<MultiLineString> | null>(null);
   private districtMarkers: Marker[] = [];
-  /** Zones teintées du mode Quartiers (IRIS, couleur par petit quartier). */
-  private readonly districtFill = signal<FeatureCollection<Polygon | MultiPolygon> | null>(null);
-  /** Vue à restaurer en sortant du mode Quartiers. */
-  private savedCamera?: { center: [number, number]; zoom: number; bearing: number; pitch: number };
+  /** Mode « grands quartiers » (interrupteur en haut à droite). */
   protected readonly districtMode = signal(false);
 
   protected readonly coverage = inject(CoverageStore);
@@ -176,8 +173,6 @@ export class MapView implements OnDestroy {
       if (d) this.source('districts')?.setData(d);
       const b = this.bigDistricts();
       if (b) this.source('districts-big')?.setData(b);
-      const fill = this.districtFill();
-      if (fill) this.source('districts-fill')?.setData(fill);
     });
     // Mode Quartiers : contours plus marqués, zones teintées, tous les noms.
     effect(() => {
@@ -232,14 +227,18 @@ export class MapView implements OnDestroy {
     const width = (base: number) =>
       ['interpolate', ['exponential', 1.6], ['zoom'], 12, base * 0.4, 15, base, 18, base * 2.6] as never;
 
-    // Grands quartiers : trait épais et discret. Petits quartiers : pointillés rose brique.
-    map.addSource('districts-fill', { type: 'geojson', data: empty });
+    const mode = this.districtMode();
+    const vis = (on: boolean) => (on ? 'visible' : 'none') as 'visible' | 'none';
+    const pink = dark ? '#F48FB1' : '#B8505E';
+
+    // Grands quartiers (mode « Quartiers ») : zones teintées, sous les rues dorées.
+    map.addSource('districts-big', { type: 'geojson', data: empty });
     map.addLayer(
       {
-        id: 'districts-fill',
+        id: 'districts-big-fill',
         type: 'fill',
-        source: 'districts-fill',
-        layout: { visibility: 'none' },
+        source: 'districts-big',
+        layout: { visibility: vis(mode) },
         paint: { 'fill-color': ['get', 'color'], 'fill-opacity': dark ? 0.28 : 0.22 },
       },
       beforeLabels,
@@ -267,35 +266,20 @@ export class MapView implements OnDestroy {
     );
 
     // Contours des quartiers au-dessus des rues dorées (sinon le doré les cache).
-    map.addSource('districts-big', { type: 'geojson', data: empty });
-    map.addLayer(
-      {
-        id: 'districts-big',
-        type: 'line',
-        source: 'districts-big',
-        paint: { 'line-color': dark ? '#F48FB1' : '#B8505E', 'line-width': 4, 'line-opacity': 0.25 },
-      },
-      beforeLabels,
-    );
+    // Tous les contours en pointillés : petits quartiers par défaut, grands en mode « Quartiers ».
     map.addSource('districts', { type: 'geojson', data: empty });
-    map.addLayer(
-      {
-        id: 'districts-halo',
-        type: 'line',
-        source: 'districts',
-        paint: { 'line-color': '#ffffff', 'line-width': 5, 'line-opacity': dark ? 0.15 : 0.6 },
-      },
-      beforeLabels,
-    );
-    map.addLayer(
-      {
-        id: 'districts',
-        type: 'line',
-        source: 'districts',
-        paint: { 'line-color': dark ? '#F48FB1' : '#B8505E', 'line-width': 1.8, 'line-dasharray': [3, 2] },
-      },
-      beforeLabels,
-    );
+    const dashed = (id: string, source: string, on: boolean, w: number) => {
+      map.addLayer(
+        { id: `${id}-halo`, type: 'line', source, layout: { visibility: vis(on) }, paint: { 'line-color': '#ffffff', 'line-width': w + 3, 'line-opacity': dark ? 0.15 : 0.6 } },
+        beforeLabels,
+      );
+      map.addLayer(
+        { id, type: 'line', source, layout: { visibility: vis(on) }, paint: { 'line-color': pink, 'line-width': w, 'line-dasharray': [3, 2] } },
+        beforeLabels,
+      );
+    };
+    dashed('districts', 'districts', !mode, 1.8);
+    dashed('districts-big', 'districts-big', mode, 2.6);
 
     map.addSource('live', { type: 'geojson', data: empty });
     map.addLayer({
@@ -322,24 +306,25 @@ export class MapView implements OnDestroy {
 
   private async loadDistricts(map: MlMap): Promise<void> {
     try {
-      const [big, small, iris] = await Promise.all(
-        ['streets/quartiers.geojson', 'streets/petits-quartiers.geojson', 'streets/iris.geojson'].map((url) =>
+      const [big, small] = (await Promise.all(
+        ['streets/grands-quartiers.geojson', 'streets/petits-quartiers.geojson'].map((url) =>
           fetch(url).then((r) => (r.ok ? r.json() : null)),
         ),
-      ) as [FeatureCollection<MultiLineString> | null, FeatureCollection<MultiLineString> | null, FeatureCollection<Polygon | MultiPolygon> | null];
-      if (big) this.bigDistricts.set(big);
-      if (!small) return;
-      this.districts.set(small);
-      if (iris) this.districtFill.set(colorIrisByDistrict(iris, small));
-      // Noms des petits quartiers : marqueurs HTML (indépendants des polices du fond de carte).
-      this.districtMarkers = small.features.map((f) => {
+      )) as [FeatureCollection<Polygon | MultiPolygon> | null, FeatureCollection<MultiLineString> | null];
+      if (big) this.bigDistricts.set(withColors(big));
+      if (small) this.districts.set(small);
+      // Noms : marqueurs HTML (indépendants des polices du fond de carte), au centre visuel.
+      const label = (f: Feature, kind: 'small' | 'big') => {
         const el = document.createElement('div');
-        el.className = 'district-label';
+        el.className = `district-label ${kind}`;
         el.textContent = String(f.properties?.['name'] ?? '');
         const { labelLon, labelLat } = f.properties as { labelLon: number; labelLat: number };
         return new Marker({ element: el }).setLngLat([labelLon, labelLat]).addTo(map);
-      });
-      // Noms masqués quand on dézoome trop : ils se chevaucheraient.
+      };
+      this.districtMarkers = [
+        ...(small?.features ?? []).map((f) => label(f, 'small')),
+        ...(big?.features ?? []).map((f) => label(f, 'big')),
+      ];
       map.on('zoom', () => this.updateDistrictLabels());
       this.updateDistrictLabels();
     } catch {
@@ -358,27 +343,27 @@ export class MapView implements OnDestroy {
   private applyDistrictModeStyle(mode: boolean): void {
     const map = this.map;
     if (!map?.getLayer('districts')) return;
-    map.setLayoutProperty('districts-fill', 'visibility', mode ? 'visible' : 'none');
-    map.setPaintProperty('districts', 'line-width', mode ? 2.6 : 1.8);
-    map.setPaintProperty('districts-big', 'line-opacity', mode ? 0.45 : 0.25);
+    for (const id of ['districts', 'districts-halo']) map.setLayoutProperty(id, 'visibility', mode ? 'none' : 'visible');
+    for (const id of ['districts-big', 'districts-big-halo', 'districts-big-fill']) map.setLayoutProperty(id, 'visibility', mode ? 'visible' : 'none');
     this.updateDistrictLabels();
   }
 
-  /** Bouton « Quartiers » : vue de tout Toulouse, puis retour à la vue précédente. */
+  /**
+   * Interrupteur « Quartiers » : activé, on dézoome sur tout Toulouse et on affiche
+   * les 20 grands quartiers (on peut ensuite zoomer librement) ; désactivé, on revient
+   * aux petits quartiers en restant à l'endroit où l'on est.
+   */
   protected toggleDistrictMode(): void {
     const map = this.map;
     if (!map) return;
-    if (this.districtMode()) {
-      this.districtMode.set(false);
-      if (this.savedCamera) map.easeTo({ ...this.savedCamera, duration: 800 });
-      return;
-    }
-    const c = map.getCenter();
-    this.savedCamera = { center: [c.lng, c.lat], zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch() };
-    this.districtMode.set(true);
-    const big = this.bigDistricts();
+    const on = !this.districtMode();
+    this.districtMode.set(on);
+    if (!on) return;
     const bounds = new LngLatBounds();
-    for (const f of big?.features ?? []) for (const line of f.geometry.coordinates) for (const [lon, lat] of line) bounds.extend([lon, lat]);
+    for (const f of this.bigDistricts()?.features ?? []) {
+      const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
+      for (const poly of polys) for (const [lon, lat] of poly[0]) bounds.extend([lon, lat]);
+    }
     if (bounds.isEmpty()) bounds.extend([1.35, 43.53]).extend([1.52, 43.67]); // commune de Toulouse, à défaut
     map.fitBounds(bounds, { padding: { top: 64, bottom: 96, left: 8, right: 8 }, bearing: 0, pitch: 0, duration: 900 });
   }
@@ -420,24 +405,15 @@ export class MapView implements OnDestroy {
 /** Palette douce : une couleur par petit quartier (stable d'une ouverture à l'autre). */
 const DISTRICT_COLORS = ['#E57373', '#F06292', '#BA68C8', '#7986CB', '#4FC3F7', '#4DB6AC', '#AED581', '#FFD54F', '#FF8A65', '#A1887F'];
 
-function colorIrisByDistrict(
-  iris: FeatureCollection<Polygon | MultiPolygon>,
-  districts: FeatureCollection<MultiLineString>,
-): FeatureCollection<Polygon | MultiPolygon> {
-  const nameByIris = new Map<string, string>();
-  for (const d of districts.features) {
-    for (const code of (d.properties?.['iris'] as string[] | undefined) ?? []) nameByIris.set(code, String(d.properties?.['name']));
-  }
+/** Ajoute une couleur à chaque quartier (propriété `color`, utilisée par la teinte). */
+function withColors(fc: FeatureCollection<Polygon | MultiPolygon>): FeatureCollection<Polygon | MultiPolygon> {
   const color = (name: string) => {
     let h = 0;
     for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
     return DISTRICT_COLORS[h % DISTRICT_COLORS.length];
   };
   return {
-    type: 'FeatureCollection',
-    features: iris.features.map((f) => {
-      const name = nameByIris.get(String(f.properties?.['code'])) ?? '';
-      return { ...f, properties: { name, color: color(name) } };
-    }),
+    ...fc,
+    features: fc.features.map((f) => ({ ...f, properties: { ...f.properties, color: color(String(f.properties?.['name'] ?? '')) } })),
   };
 }

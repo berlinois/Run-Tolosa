@@ -3,7 +3,9 @@
 //  2. sinon (nom de rue, de lieu…) il prend le nom du quartier OSM situé dedans
 //     (le plus proche de son centre), ou à défaut du quartier OSM le plus proche ;
 //  3. les IRIS qui finissent avec le même nom sont réunis (contours internes retirés).
-// Usage : node scripts/build-neighbourhoods.mjs → public/streets/petits-quartiers.geojson
+// Usage : node scripts/build-neighbourhoods.mjs
+//   → public/streets/petits-quartiers.geojson (contours + nom au centre visuel)
+//   → public/streets/grands-quartiers.geojson (20 quartiers en polygones, nom au centre visuel)
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const iris = JSON.parse(readFileSync('public/streets/iris.geojson', 'utf8'));
@@ -145,3 +147,38 @@ writeFileSync('public/streets/petits-quartiers.geojson', JSON.stringify({
 }));
 console.log(decisions.join('\n'));
 console.log(`\n${iris.features.length} IRIS → ${features.length} petits quartiers`);
+
+// ---- Grands quartiers : on recolle les morceaux de frontière OSM en anneaux fermés.
+function joinRings(lines) {
+  const k = (p) => `${p[0]},${p[1]}`;
+  const pool = lines.map((l) => l.slice());
+  const rings = [];
+  while (pool.length) {
+    let ring = pool.shift();
+    let guard = 0;
+    while (k(ring[0]) !== k(ring[ring.length - 1]) && guard++ < 10000) {
+      const end = k(ring[ring.length - 1]);
+      const i = pool.findIndex((l) => k(l[0]) === end || k(l[l.length - 1]) === end);
+      if (i < 0) break; // anneau incomplet : on le ferme tel quel
+      const next = pool.splice(i, 1)[0];
+      ring = ring.concat((k(next[0]) === end ? next : next.slice().reverse()).slice(1));
+    }
+    if (k(ring[0]) !== k(ring[ring.length - 1])) ring.push(ring[0]);
+    if (ring.length >= 4) rings.push(ring);
+  }
+  return rings;
+}
+const bigFeatures = big.features.map((f) => {
+  const rings = joinRings(f.geometry.coordinates);
+  const geometry = rings.length === 1
+    ? { type: 'Polygon', coordinates: [rings[0]] }
+    : { type: 'MultiPolygon', coordinates: rings.map((r) => [r]) };
+  const [labelLon, labelLat] = visualCenter([geometry], rings);
+  return { type: 'Feature', properties: { name: f.properties.name, ref: f.properties.ref, labelLon, labelLat }, geometry };
+});
+writeFileSync('public/streets/grands-quartiers.geojson', JSON.stringify({
+  type: 'FeatureCollection',
+  attribution: '© OpenStreetMap contributors (ODbL)',
+  features: bigFeatures,
+}));
+console.log(`${bigFeatures.length} grands quartiers (${bigFeatures.filter((f) => f.geometry.type === 'Polygon').length} d'un seul tenant)`);

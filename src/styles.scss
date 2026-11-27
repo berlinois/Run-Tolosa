@@ -16,12 +16,8 @@ html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
   box-shadow: 0 1px 3px #0003;
   pointer-events: none;
 }
-.district-labels-hidden .district-label { display: none; }
-
-/* Mode Quartiers : tous les noms, en plus petit. */
-.district-mode .district-label {
-  max-width: 76px;
-  padding: 1px 4px;
-  font-size: 9px;
-  border-radius: 5px;
-}
+.district-label.big { display: none; font-size: 10px; max-width: 96px; color: #6d2533; }
+.district-labels-hidden .district-label.small { display: none; }
+/* Mode Quartiers : seuls les 20 grands quartiers sont nommés. */
+.district-mode .district-label.small { display: none; }
+.district-mode .district-label.big { display: block; }
