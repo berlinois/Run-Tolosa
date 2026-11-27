@@ -4,9 +4,16 @@ name: Extraction des rues OSM
 # et le commite sur la branche. Lancement manuel, ou quand le script change.
 on:
   workflow_dispatch:
+    inputs:
+      what:
+        description: "Quoi extraire : tout, rues ou quartiers"
+        type: choice
+        options: [tout, rues, quartiers]
+        default: tout
   push:
     paths:
       - scripts/extract-streets.mjs
+      - scripts/extract-districts.mjs
       - .github/workflows/extract-streets.yml
 
 concurrency:
@@ -24,8 +31,13 @@ jobs:
         with:
           node-version: 22
 
-      - name: Extraction
+      - name: Extraction des rues
+        if: ${{ github.event_name == 'push' || inputs.what != 'quartiers' }}
         run: node scripts/extract-streets.mjs
+
+      - name: Extraction des quartiers
+        if: ${{ github.event_name == 'push' || inputs.what != 'rues' }}
+        run: node scripts/extract-districts.mjs
 
       - name: Commit du référentiel
         run: |
@@ -35,5 +47,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add public/streets
-          git commit -m "Rues OSM de Toulouse régénérées [skip ci]"
+          git commit -m "Référentiel OSM de Toulouse régénéré [skip ci]"
           git push
