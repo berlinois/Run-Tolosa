@@ -189,6 +189,7 @@ scripts/
   extract-streets.mjs      OSM (Overpass) → tronçons             ✅ Phase 2
   generate-icons.mjs       design/icon.svg → icônes Android      ✅
   build-splash.mjs         données → écran d'accueil (splash.svg) ✅
+  extract-water.mjs        Garonne et canaux (OSM) → eau.geojson  ✅
 ```
 
 ## Feuille de route

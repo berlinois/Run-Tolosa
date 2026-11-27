@@ -8,8 +8,8 @@ const icon = readFileSync('design/icon.svg', 'utf8');
 
 const W = 390, H = 844;
 // Cadrage : le cœur de Toulouse, de Saint-Cyprien à la Cité de l'espace.
-const CENTER = [1.4555, 43.6005];
-const SPAN_LON = 0.074; // largeur visible en degrés de longitude
+const CENTER = [1.4560, 43.6010];
+const SPAN_LON = 0.090; // largeur visible en degrés de longitude
 const k = Math.cos((43.6 * Math.PI) / 180);
 const sc = W / (SPAN_LON * k);
 const P = (lon, lat) => [W / 2 + (lon - CENTER[0]) * k * sc, H / 2 + 40 - (lat - CENTER[1]) * sc];
@@ -92,8 +92,17 @@ const smooth = (pts) => {
   }
   return d + ` L${p.at(-1)[0].toFixed(1)} ${p.at(-1)[1].toFixed(1)}`;
 };
-const garonne = smooth([[1.4285, 43.528], [1.43, 43.547], [1.433, 43.562], [1.4372, 43.576], [1.4405, 43.587], [1.4392, 43.5955], [1.435, 43.6025], [1.43, 43.6085], [1.4225, 43.615], [1.4165, 43.6235], [1.4122, 43.6335], [1.4092, 43.6455], [1.4065, 43.66], [1.404, 43.672]]);
-const canal = smooth([[1.429, 43.6155], [1.437, 43.6162], [1.446, 43.614], [1.4528, 43.61], [1.4575, 43.604], [1.4605, 43.598], [1.4612, 43.5915], [1.464, 43.586], [1.472, 43.579], [1.485, 43.569], [1.499, 43.559], [1.515, 43.548]]);
+let water = null;
+try { water = JSON.parse(readFileSync('public/streets/eau.geojson', 'utf8')); } catch { /* tracés stylisés à défaut */ }
+const waterPath = (pred) => (water?.features ?? []).filter(pred).map((f) => 'M' + f.geometry.coordinates.map(([lo, la]) => P(lo, la).map((v) => v.toFixed(1)).join(' ')).join('L')).join('');
+const garonneStylized = smooth([[1.4285, 43.528], [1.43, 43.547], [1.433, 43.562], [1.4372, 43.576], [1.4405, 43.587], [1.4392, 43.5955], [1.435, 43.6025], [1.43, 43.6085], [1.4225, 43.615], [1.4165, 43.6235], [1.4122, 43.6335], [1.4092, 43.6455], [1.4065, 43.66], [1.404, 43.672]]);
+const canalStylized = smooth([[1.429, 43.6155], [1.437, 43.6162], [1.446, 43.614], [1.4528, 43.61], [1.4575, 43.604], [1.4605, 43.598], [1.4612, 43.5915], [1.464, 43.586], [1.472, 43.579], [1.485, 43.569], [1.499, 43.559], [1.515, 43.548]]);
+
+const realGaronne = waterPath((f) => /Garonne/.test(f.properties.name) && f.properties.kind === 'river');
+const realCanals = waterPath((f) => f.properties.kind === 'canal');
+const garonne = realGaronne || garonneStylized;
+const canal = realCanals || canalStylized;
+console.log(water ? 'Garonne et canaux : tracés OSM' : 'Garonne et canaux : tracés stylisés');
 
 // ---- Monuments dessinés au trait (fins, sans remplissage), centrés en (0, 0), ~34 px.
 const ICONS = {
@@ -101,22 +110,28 @@ const ICONS = {
   capitole: `<path d="M-15 0H15M-14-2H14M-13-14L0-21L13-14ZM-13-14H13M-13-12H13"/><path d="M-10-12V-2M-6-12V-2M-2-12V-2M2-12V-2M6-12V-2M10-12V-2"/>`,
   pontneuf: `<path d="M-17-8H17M-17-5H17"/><path d="M-15 2A5 5 0 0 1-5 2M-5 2A5 5 0 0 1 5 2M5 2A5 5 0 0 1 15 2"/><path d="M-15 2V-5M-5 2V-5M5 2V-5M15 2V-5"/><path d="M-10-5.5a1.2 1.2 0 1 0 .01 0M0-5.5a1.2 1.2 0 1 0 .01 0M10-5.5a1.2 1.2 0 1 0 .01 0"/>`,
   grave: `<path d="M-11 0H11M-9 0V-8H9V0M-9-8C-9-17 9-17 9-8M-2-15.5V-19H2V-15.5M0-19V-22"/><path d="M-5-3V-6M0-3V-6M5-3V-6"/>`,
-  etienne: `<path d="M-13 0H13M-12 0V-11H1V0M-12-11L-5.5-17L1-11M1 0V-25H9V0M1-19H9M3-25V-28.5H7V-25M5-28.5V-31"/><path d="M-5.5-6.5a2.6 2.6 0 1 0 .01 0M-9 0V-3M-2 0V-3M5 0V-4"/>`,
+  fusee: `<path d="M0-31C4.5-26 5.5-19 5.5-11V-3H-5.5V-11C-5.5-19-4.5-26 0-31Z"/><path d="M-5.5-9L-10.5-2V0H-5.5M5.5-9L10.5-2V0H5.5M-2.5-3V1M2.5-3V1"/><path d="M0-22.5a2.4 2.4 0 1 0 .01 0M-5.5-14H5.5"/>`,
+  matabiau: `<path d="M-15 0H15M-14 0V-11H14V0M-14-11L0-16L14-11M-4-16V-23H4V-16"/><path d="M0-21.2a1.6 1.6 0 1 0 .01 0"/><path d="M-10 0V-5A2 2 0 0 1-6-5V0M-2 0V-5A2 2 0 0 1 2-5V0M6 0V-5A2 2 0 0 1 10-5V0"/>`,
+  wallon: `<path d="M-7 0V-27M7 0V-27M-7-13H7"/><path d="M0-19.5C3.2-19.5 5-21.4 5-23.5S3.2-27.5 0-27.5S-5-25.6-5-23.5S-3.2-19.5 0-19.5ZM-2.2-23.5H2.2"/><path d="M-12 0H12"/>`,
+  stadium: `<path d="M-16-8A16 8 0 1 0 16-8A16 8 0 1 0-16-8Z"/><path d="M-9-8A9 4 0 1 0 9-8A9 4 0 1 0-9-8Z"/><path d="M0-12V-4M-16-8V-3A16 8 0 0 0 16-3V-8"/>`,
 };
 const MONUMENTS = [
   ['grave', 1.4335, 43.5995, 'La Grave'],
   ['pontneuf', 1.4395, 43.5997, 'Pont-Neuf'],
+  ['stadium', 1.4335, 43.5832, 'Stadium'],
   ['capitole', 1.4436, 43.6045, 'Capitole'],
-  ['etienne', 1.4513, 43.6000, 'Saint-Étienne'],
+  ['matabiau', 1.4536, 43.6112, 'Matabiau'],
+  ['fusee', 1.4940, 43.5864, "Cité de l'espace"],
+  ['wallon', 1.4158, 43.6212, 'Ernest-Wallon'],
   ['sernin', 1.4421, 43.6083, 'Saint-Sernin'],
 ];
 // Décalages légers pour aérer le centre-ville (les icônes restent sur leur quartier).
-const NUDGE = { grave: [-16, 10], pontneuf: [-4, 30], capitole: [30, 2], etienne: [18, -6], sernin: [0, -8] };
+const NUDGE = { grave: [-20, 8], pontneuf: [-2, 30], stadium: [0, 8], capitole: [26, 4], matabiau: [10, -4], fusee: [-22, 0], wallon: [26, 4], sernin: [-8, -10] };
 let mon = '';
 MONUMENTS.forEach(([id, lo, la, name], i) => {
   const [x, y] = P(lo, la);
   const [dx, dy] = NUDGE[id];
-  mon += `<g class="mon" style="animation-delay:${(0.6 + i * 0.3).toFixed(2)}s" transform="translate(${(x + dx).toFixed(1)} ${(y + dy).toFixed(1)})">` +
+  mon += `<g class="mon" style="animation-delay:${(0.5 + i * 0.25).toFixed(2)}s" transform="translate(${(x + dx).toFixed(1)} ${(y + dy).toFixed(1)})">` +
     `<g class="ico" transform="scale(1.35)">${ICONS[id]}</g><text y="16">${name.toUpperCase()}</text></g>`;
 });
 
@@ -150,8 +165,8 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" pre
 <g class="net" fill="none" stroke-linecap="round">
   <path d="${minor}" stroke="#FFD6DF" stroke-opacity=".2" stroke-width=".5"/>
   <path d="${major}" stroke="#FFE3E9" stroke-opacity=".42" stroke-width=".9"/>
-  <path d="${canal}" stroke="#BFE6F7" stroke-opacity=".75" stroke-width="1.6"/>
-  <path d="${garonne}" stroke="#8FD3F0" stroke-opacity=".9" stroke-width="5"/>
+  <path d="${canal}" stroke="#BFE6F7" stroke-opacity=".8" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="${garonne}" stroke="#8FD3F0" stroke-opacity=".9" stroke-width="4.5" stroke-linejoin="round"/>
 </g>
 <path class="walk-glow" pathLength="1" d="${walk}" stroke="#F7C64F" stroke-opacity=".55" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
 <path class="walk" pathLength="1" d="${walk}" stroke="#FFD66B" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
@@ -166,5 +181,5 @@ ${mon}
 </g>
 </svg>
 `;
-writeFileSync('public/splash.svg', svg);
-console.log(`public/splash.svg : ${(svg.length / 1024).toFixed(0)} Ko, marche ${walkPts.length} points`);
+writeFileSync(process.argv[2] ?? 'public/splash.svg', svg);
+console.log(`${process.argv[2] ?? 'public/splash.svg'} : ${(svg.length / 1024).toFixed(0)} Ko, marche ${walkPts.length} points`);
