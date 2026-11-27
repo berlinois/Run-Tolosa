@@ -9,7 +9,8 @@ de serveur, pas de compte, pas d'abonnement. **Coût : 0 €.**
 | Feature | Description | État |
 |---|---|---|
 | **Carte de Toulouse** | Fond de carte OpenFreeMap affiché avec MapLibre, sans clé d'API | ✅ |
-| **Me localiser** | Bouton rond 📍 : position actuelle et précision du GPS | ✅ |
+| **Me localiser** | Bouton rond 📍 : position actuelle, et précision du GPS affichée 4 s | ✅ |
+| **Fonds de carte** | Bouton rond « calques », puis un panneau : **Clair** (par défaut), **Plan**, **Sombre** (OpenFreeMap), **Plan IGN**, **Photo aérienne** (IGN Géoplateforme). Tous gratuits et sans clé, le choix est retenu | ✅ |
 | **Enregistrer une marche** | Bouton « Démarrer / Arrêter ». Le GPS est lu toutes les 2 s, **même écran éteint**, avec une notification qui affiche la distance et un bouton Arrêter | ✅ |
 | **Marche trop courte** | À l'arrêt d'une marche de moins de 5 min, une popup « Marche trop courte » s'affiche. **Supprimer** (rouge) efface définitivement la marche, **Sauvegarder quand même** la garde | ✅ |
 | **Suivi en direct** | Chrono, distance et nombre de points. Trace en cours en **bleu** | ✅ |
@@ -18,13 +19,13 @@ de serveur, pas de compte, pas d'abonnement. **Coût : 0 €.**
 | **Logo** | Le clocher de Saint-Sernin au bout d'une marche dorée, avec la Garonne, sur fond rose brique. Icône Android adaptative et ronde, écran de démarrage. Source : `design/icon.svg`, régénération : `node scripts/generate-icons.mjs` | ✅ |
 | **Version affichée** | En bas de la légende | ✅ |
 | **Mises à jour en un tap** | Via Obtainium, à chaque Release produite par la CI | ✅ |
-| **Rues parcourues** | Les tronçons OSM de la commune de Toulouse validés par tes marches (au moins 60 % du tronçon parcouru) sont tracés en **doré épais**. Les rues jamais parcourues n'ont pas de trait, et la trace GPS des marches terminées n'est pas affichée. Bords de Garonne et canal du Midi compris | ✅ |
+| **Rues parcourues** | Les tronçons OSM de la commune de Toulouse validés par tes marches (au moins 60 % du tronçon parcouru) sont tracés en **doré épais**. Le doré passe sous les noms de rues, qui restent lisibles. Les rues jamais parcourues n'ont pas de trait, et la trace GPS des marches terminées n'est pas affichée. Bords de Garonne et canal du Midi compris | ✅ |
 | **Total parcouru** | Dans la légende : km de rues validées et nombre de tronçons | ✅ |
 | **Stats par quartier** | % de rues parcourues pour chaque quartier de Toulouse, en plus du % global | 💡 Idée |
 | **Carte interactive des quartiers** | Un tap sur un quartier zoome dessus et affiche ses rues faites et pas faites | 💡 Idée |
 | **Parcs** | Plus de 50 % des chemins d'un parc parcourus : le parc entier est validé, avec une couleur dédiée | 💡 Idée |
 | **Dernière marche, marche la plus longue** | Mises en valeur (rose ?) | 💡 Idée |
-| **Fonds de carte** | Bouton « calques » : clair, plan, sombre, Plan IGN, photo aérienne | 💡 Idée |
+| **Gestion des marches** | Tableau des marches (date, durée, distance), avec suppression définitive des faux départs | 💡 Idée |
 | **Carte hors ligne** | Fond PMTiles de Toulouse embarqué | ⏳ Phase 3 |
 | **Stats** | % de Toulouse parcouru, km, quartiers, couleurs selon l'ancienneté | ⏳ Phase 4 |
 

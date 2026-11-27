@@ -152,7 +152,8 @@ src/app/
     streets.ts             format du référentiel des tronçons    ✅ Phase 2
     matcher.ts             points GPS → tronçons validés         ✅ Phase 2
     coverage.store.ts      coverage.json, rues dorées, stats     ✅ Phase 2
-  map/map.ts               carte MapLibre + calques              ✅ Phase 0-1
+  map/map.ts               carte MapLibre + calques de l'appli   ✅
+  map/basemaps.ts          fonds : OpenFreeMap + IGN (WMTS)      ✅
   tracking/
     model.ts               Walk, TrackPoint                      ✅ Phase 1
     tracking.plugin.ts     pont vers le plugin Java              ✅ Phase 1
