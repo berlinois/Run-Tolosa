@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { TrackingStore } from '../tracking/tracking.store';
+import { WalksUiService } from '../walks/walks-ui.service';
 import { Export, type ExportResult } from './export.plugin';
 
 type Destination = 'downloads' | 'picker';
@@ -9,12 +10,22 @@ type Destination = 'downloads' | 'picker';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (tracking.available) {
-      <button type="button" class="fab" (click)="open()" aria-label="Exporter mes marches">
+      <button type="button" class="fab" [class.on]="menuOpen()" (click)="menuOpen.set(!menuOpen())" aria-label="Plus d'options" [attr.aria-expanded]="menuOpen()">
         <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-          <path d="M12 3v11m0 0-4.5-4.5M12 14l4.5-4.5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"
-                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <circle cx="5.5" cy="12" r="1.9" /><circle cx="12" cy="12" r="1.9" /><circle cx="18.5" cy="12" r="1.9" />
         </svg>
       </button>
+      @if (menuOpen()) {
+        <div class="menu-catcher" (click)="menuOpen.set(false)"></div>
+        <div class="menu" role="menu">
+          <button type="button" role="menuitem" class="item main" (click)="openWalks()">
+            <span class="emo">📋</span><span>Mes marches<small>liste, détail, suppression</small></span>
+          </button>
+          <button type="button" role="menuitem" class="item" (click)="menuOpen.set(false); open()">
+            <span class="emo">⤓</span><span>Exporter<small>zip des traces brutes</small></span>
+          </button>
+        </div>
+      }
     }
 
     @if (dialogOpen()) {
@@ -70,6 +81,18 @@ type Destination = 'downloads' | 'picker';
       display: grid; place-items: center;
       background: #fff; color: #37474f; box-shadow: 0 2px 6px #0004;
     }
+    .fab svg { fill: currentColor; }
+    .fab.on { background: #B8505E; color: #fff; }
+    .menu-catcher { position: fixed; inset: 0; z-index: 6; }
+    .menu {
+      position: absolute; z-index: 7; right: 76px; bottom: calc(env(safe-area-inset-bottom) + 88px);
+      width: 220px; padding: 6px; border-radius: 16px; background: #fff; box-shadow: 0 8px 24px #0005;
+    }
+    .item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 12px; border: 0; border-radius: 10px;
+      background: none; text-align: left; font-size: 15px; font-weight: 600; color: #263238; }
+    .item.main { background: #fbeaec; color: #8e2f40; }
+    .item small { display: block; font-size: 12px; font-weight: 400; color: #78909c; }
+    .emo { font-size: 18px; width: 22px; text-align: center; }
     .backdrop { position: fixed; inset: 0; z-index: 20; background: #0007; }
     .dialog {
       position: fixed; z-index: 21; left: 16px; right: 16px; top: 50%; transform: translateY(-50%);
@@ -104,6 +127,13 @@ export class ExportButton {
   protected readonly tracking = inject(TrackingStore);
 
   protected readonly dialogOpen = signal(false);
+  protected readonly menuOpen = signal(false);
+  private readonly walksUi = inject(WalksUiService);
+
+  protected openWalks(): void {
+    this.menuOpen.set(false);
+    this.walksUi.pageOpen.set(true);
+  }
   protected readonly destination = signal<Destination>('downloads');
   protected readonly fileName = signal('');
   protected readonly exporting = signal(false);

@@ -14,6 +14,9 @@ export class RecapStore {
   private readonly recaps = signal<WalkRecap[]>([]);
   private loaded?: Promise<void>;
 
+  /** Tous les récaps (signal, pour la liste des marches). */
+  readonly all = this.recaps.asReadonly();
+
   /** Dernier récap pas encore affiché. */
   readonly pending = computed(() => [...this.recaps()].reverse().find((r) => !r.shown) ?? null);
 

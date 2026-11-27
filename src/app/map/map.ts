@@ -20,6 +20,7 @@ import { SplashService } from '../core/splash.service';
 import { BASEMAPS, basemapById, overlayInsertionPoint, loadBasemapChoice, saveBasemapChoice, type Basemap, type BasemapId } from './basemaps';
 import { CoverageStore } from '../streets/coverage.store';
 import { RecapCard } from '../recap/recap-card';
+import { WalksUiService } from '../walks/walks-ui.service';
 import { RecapStore } from '../recap/recap.store';
 import type { WalkRecap } from '../recap/recap.model';
 import { DistrictCard } from '../streets/district-card';
@@ -162,6 +163,7 @@ export class MapView implements OnDestroy {
   private readonly location = inject(LocationService);
   protected readonly tracking = inject(TrackingStore);
   protected readonly recaps = inject(RecapStore);
+  private readonly walksUi = inject(WalksUiService);
   private readonly injector = inject(Injector);
   private readonly splash = inject(SplashService);
   /** Position demandée dès le lancement (le GPS travaille pendant l'animation d'accueil). */
@@ -257,6 +259,19 @@ export class MapView implements OnDestroy {
         const shown = (v: number) => (v > 0 ? Math.max(v, 4) : 0);
         l.gold.style.width = `${shown(pct(st.goldM))}%`;
         l.pink.style.width = `${shown(pct(st.doneM - st.goldM))}%`;
+      }
+    });
+    // « Voir sur la carte » depuis Mes marches : la trace de cette marche seule, cadrée.
+    effect(() => {
+      if (!this.styleReady()) return;
+      const f = this.walksUi.focus();
+      this.source('focus')?.setData(
+        f ? { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: f.trace } } : { type: 'FeatureCollection', features: [] },
+      );
+      if (f && this.map) {
+        const bounds = new LngLatBounds();
+        for (const p of f.trace) bounds.extend(p);
+        this.map.fitBounds(bounds, { padding: { top: 140, bottom: 140, left: 30, right: 90 }, maxZoom: 16.5, duration: 800 });
       }
     });
     // Quartier sélectionné : contour en halo bleu.
@@ -430,6 +445,18 @@ export class MapView implements OnDestroy {
       beforeLabels,
     );
 
+    map.addSource('focus', { type: 'geojson', data: empty });
+    map.addLayer({
+      id: 'focus-casing', type: 'line', source: 'focus',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#ffffff', 'line-width': 8, 'line-opacity': 0.9 },
+    });
+    map.addLayer({
+      id: 'focus', type: 'line', source: 'focus',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': dark ? '#4FC3F7' : '#1E88E5', 'line-width': 4 },
+    });
+
     map.addSource('live', { type: 'geojson', data: empty });
     map.addLayer({
       id: 'live',
@@ -599,6 +626,7 @@ export class MapView implements OnDestroy {
   private onMapClick(x: number, y: number): void {
     const map = this.map;
     this.districtSelection.set(null); // tout tap sur la carte ferme les stats du quartier
+    this.walksUi.focus.set(null); // et retire la marche affichée seule
     const ctx = this.coverage.context();
     if (!map || !ctx || !map.getLayer('streets')) return;
     const r = 14; // zone de tap élargie autour du trait

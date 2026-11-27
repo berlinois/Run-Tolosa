@@ -128,6 +128,48 @@ export class CoverageStore {
     }
   }
 
+  /**
+   * Récaps des marches qui n'en ont pas (marches antérieures à la feature) : on rejoue
+   * les marches dans l'ordre chronologique à partir de la couverture brute, sans refaire
+   * l'association GPS / rues. Ces récaps sont marqués « déjà vus » (pas de popup).
+   * Renvoie le nombre de récaps créés.
+   */
+  async backfillRecaps(walks: Walk[]): Promise<number> {
+    await this.running;
+    const cov = this.file();
+    const streets = this.streets();
+    const index = this.index();
+    if (!cov || !streets || !index) return 0;
+    const finished = walks.filter((w) => w.status !== 'recording' && cov.walkIds.includes(w.id)).sort((a, b) => a.startedAt - b.startedAt);
+    const missing = new Set<string>();
+    for (const w of finished) if (!(await this.recaps.has(w.id))) missing.add(w.id);
+    if (missing.size === 0) return 0;
+    const quartierOf = await this.loadQuartiers();
+    let before: RawCoverage = { walkDates: {}, segments: {} };
+    let created = 0;
+    for (const walk of finished) {
+      const segments = { ...before.segments };
+      for (const [segId, entries] of Object.entries(cov.segments)) {
+        const e = entries[walk.id];
+        if (e) segments[segId] = { ...(segments[segId] ?? {}), [walk.id]: e };
+      }
+      const after: RawCoverage = { walkDates: { ...before.walkDates, [walk.id]: cov.walkDates[walk.id] ?? walk.startedAt }, segments };
+      if (missing.has(walk.id)) {
+        try {
+          const { points } = await Tracking.getTrack({ walkId: walk.id });
+          const history = (await this.recaps.history()).filter((r) => r.startedAt < walk.startedAt);
+          const recap = buildRecap({ walk, points, before, after, streets, index, quartierOf, walks: finished, history });
+          await this.recaps.add({ ...recap, shown: true });
+          created++;
+        } catch (e) {
+          console.warn('Récap rétroactif impossible', walk.id, e);
+        }
+      }
+      before = after;
+    }
+    return created;
+  }
+
   /** Une marche supprimée ne doit plus compter : on recalcule tout. */
   async reset(): Promise<void> {
     await this.running;

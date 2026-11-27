@@ -193,6 +193,9 @@ src/app/
     fun-facts.ts           catalogue des stats rigolotes, records ✅
     recap.store.ts         recaps.json                           ✅
     recap-card.ts          carte récap « trophée »               ✅
+  walks/
+    walks-page.ts          Mes marches : liste, détail, suppression ✅
+    walks-ui.service.ts    page ouverte, marche affichée seule    ✅
   export/
     export-button.ts       bouton ⤓ + popup d'extraction         ✅ Phase 1
 android/app/src/main/java/fr/runtolosa/app/

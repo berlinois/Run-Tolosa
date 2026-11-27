@@ -102,16 +102,20 @@ export class TrackingStore {
   async deleteShortWalk(): Promise<void> {
     const walk = this.shortWalk();
     if (!walk) return;
+    this.shortWalk.set(null);
+    await this.deleteWalk(walk.id);
+  }
+
+  /** Suppression définitive d'une marche (trace, récap) ; la couverture est recalculée. */
+  async deleteWalk(walkId: string): Promise<void> {
     this.busy.set(true);
     try {
-      await Tracking.deleteWalk({ walkId: walk.id });
-      await this.recaps.remove(walk.id);
-      this.shortWalk.set(null);
+      await Tracking.deleteWalk({ walkId });
+      await this.recaps.remove(walkId);
       await this.coverage.reset(); // elle a peut-être déjà été comptée : on recalcule
       await this.refresh();
     } catch (e) {
       this.error.set((e as Error).message);
-      this.shortWalk.set(null);
     } finally {
       this.busy.set(false);
     }

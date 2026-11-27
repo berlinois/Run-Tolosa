@@ -41,8 +41,14 @@ Légende : ✅ fait · 🧪 en test · ⏳ prévu · 💡 idée
   - Les contours des petits quartiers viennent des IRIS (INSEE/IGN), avec les noms de quartiers OSM. Un nom de rue est remplacé par le quartier qui se trouve dans la zone, ou le plus proche (`scripts/build-neighbourhoods.mjs`)
   - **Interrupteur « 🗺 Quartiers »** (en haut à droite). **Activé** : dézoom sur tout Toulouse, avec les **20 grands quartiers** teintés, en pointillés plus épais et nommés. **Désactivé** : retour aux petits quartiers, sans bouger la carte
   - ✅ **Stats d'un quartier** : un tap sur le **nom** d'un quartier met un halo bleu sur son contour et ouvre une carte de stats. On y trouve une barre validé / parcouru, les rues dorées et parcourues sur le total, les km, les marches, le dernier passage et les tronçons. La carte se recadre pour montrer tout le quartier entre la légende et la carte de stats
+- ✅ **Mes marches**
+  - **Menu « ⋯ »** (bouton rond de la colonne de droite) : **Mes marches** et **Exporter**
+  - **Liste des marches** : totaux (km, temps, rues gagnées), puis un tableau par mois avec la **date**, la **durée**, la **distance** et les **rues gagnées** (rose / doré). Les **faux départs** sont signalés
+  - **Détail d'une marche** (tap sur la ligne) : trace, pas, dénivelé, allure, rues gagnées, quartiers, record et stat rigolote. **Voir sur la carte** affiche la trace de cette marche seule et cadre dessus
+  - **Suppression** (🗑 en fin de ligne ou dans le détail), toujours confirmée. Elle est définitive et la couverture est recalculée
+  - Les rues gagnées des **anciennes marches** sont recalculées une fois, à la première ouverture de la liste
 - ✅ **Mes données**
-  - **Extraire mes marches** : bouton rond ⤓, puis une popup de confirmation. Le zip des traces brutes va dans **Téléchargements** par défaut, ou à un autre emplacement au choix
+  - **Extraire mes marches** : menu « ⋯ », puis Exporter et une popup de confirmation. Le zip des traces brutes va dans **Téléchargements** par défaut, ou à un autre emplacement au choix
 - ✅ **Appli**
   - **Écran d'accueil animé** pendant la localisation. Sur un fond bordeaux, cadré sur le cœur de Toulouse, s'affichent le réseau des rues, la Garonne, le canal du Midi et le canal de Brienne (**tracés réels** OSM), et 8 monuments **dessinés au trait doré** : Saint-Sernin, Capitole, Matabiau, Pont-Neuf, la Grave, Stadium, Ernest-Wallon et Cité de l'espace. Une **marche dorée se dessine sur les vraies rues**, de Guilheméry au Grand Rond puis à Saint-Sernin, et un point lumineux s'allume à l'arrivée. Pendant l'animation, l'appli ne fait aucun travail lourd, pour qu'elle reste fluide : seul le GPS cherche ta position. La carte et tes données se chargent ensuite, derrière l'écran, qui **glisse vers le haut** une fois la carte prête et centrée sur toi (au plus tard après 9 s). Source : `scripts/build-splash.mjs` → `public/splash.svg`, avec les tracés de l'eau extraits par `scripts/extract-water.mjs`
   - **Logo** : le clocher de Saint-Sernin au bout d'une marche dorée, sur fond rose brique. Icône adaptative et ronde, et écran de démarrage. Source : `design/icon.svg`, régénération : `node scripts/generate-icons.mjs`
@@ -51,7 +57,6 @@ Légende : ✅ fait · 🧪 en test · ⏳ prévu · 💡 idée
   - 💡 **Carte interactive des quartiers** : un tap sur un quartier zoome dessus et montre ses rues faites et pas faites
   - 💡 **Parcs** : avec plus de 50 % des chemins d'un parc parcourus, le parc entier est validé, avec une couleur dédiée
   - 💡 **Dernière marche, marche la plus longue** : mises en valeur sur la carte
-  - 💡 **Gestion des marches** : tableau des marches (date, durée, distance), avec suppression définitive des faux départs
   - ⏳ **Carte hors ligne** (Phase 3) : fond PMTiles de Toulouse embarqué
   - ⏳ **Stats globales** (Phase 4) : % de Toulouse parcouru, couleurs selon l'ancienneté
 
