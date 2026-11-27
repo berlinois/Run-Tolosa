@@ -6,6 +6,8 @@ export interface FunContext {
   startedAt: number;
   durationMs: number;
   distanceM: number;
+  /** Vrais pas (podomètre), sinon estimés à partir de la distance. */
+  steps?: number;
   /** Rues touchées par la marche (noms), et longueurs des rues devenues dorées. */
   streetNames: string[];
   newGoldLengths: { name: string; lengthM: number }[];
@@ -38,7 +40,9 @@ const CATALOG: ((c: FunContext) => Candidate | null)[] = [
   (c) => c.distanceM >= 800 ? { id: 'grand-rond', family: 'equivalence', icon: '⭕', text: `L'équivalent de ${nf(c.distanceM / 760, 1)} tours du Grand Rond.` } : null,
   (c) => c.distanceM >= 600 ? { id: 'jean-jaures', family: 'equivalence', icon: '🌳', text: `${nf(c.distanceM / 650, 1)} fois les allées Jean-Jaurès.` } : null,
   (c) => c.distanceM >= 1000 ? { id: 'chocolatine', family: 'equivalence', icon: '🥐', text: `Environ ${nf((c.distanceM / 1000) * 50 / 280, 1)} chocolatine brûlée. Méritée.` } : null,
-  (c) => c.distanceM >= 300 ? { id: 'pas', family: 'equivalence', icon: '👣', text: `À peu près ${nf(Math.round(c.distanceM / 0.72 / 10) * 10)} pas dans les rues de Toulouse.` } : null,
+  (c) => c.steps !== undefined && c.steps >= 500
+    ? { id: 'pas', family: 'equivalence', icon: '👣', text: `${nf(c.steps)} pas, soit une foulée moyenne de ${nf((c.distanceM / c.steps) * 100)} cm.` }
+    : c.distanceM >= 300 ? { id: 'pas', family: 'equivalence', icon: '👣', text: `À peu près ${nf(Math.round(c.distanceM / 0.72 / 10) * 10)} pas dans les rues de Toulouse.` } : null,
   (c) => c.distanceM >= 300 ? { id: 'capitole', family: 'equivalence', icon: '🏛️', text: `${nf(c.distanceM / 135, 1)} fois la façade du Capitole.` } : null,
   (c) => c.distanceM >= 500 ? { id: 'rugby', family: 'equivalence', icon: '🏉', text: `${nf(c.distanceM / 100)} terrains d'Ernest-Wallon, en-but compris (ou presque).` } : null,
   (c) => c.durationMs >= 10 * 60_000 ? { id: 'nougaro', family: 'equivalence', icon: '🎶', text: `Le temps d'écouter ${nf(c.durationMs / 200_000)} fois « Ô Toulouse » de Nougaro.` } : null,

@@ -29,7 +29,9 @@ import org.json.JSONObject;
                         Manifest.permission.ACCESS_FINE_LOCATION,
                         Manifest.permission.ACCESS_COARSE_LOCATION
                 }),
-                @Permission(alias = "notifications", strings = {"android.permission.POST_NOTIFICATIONS"})
+                @Permission(alias = "notifications", strings = {"android.permission.POST_NOTIFICATIONS"}),
+                // Podomètre (Android 10+) : facultatif, la marche s'enregistre sans.
+                @Permission(alias = "activity", strings = {"android.permission.ACTIVITY_RECOGNITION"})
         })
 public class TrackingPlugin extends Plugin {
 

@@ -5,6 +5,10 @@ export interface WalkRecap {
   endedAt: number;
   durationMs: number;
   distanceM: number;
+  /** Pas (podomètre) et dénivelé (baromètre), si le téléphone les a mesurés. */
+  steps?: number;
+  ascentM?: number;
+  descentM?: number;
   /** Rues passées de rien → rose, rien → doré, rose → doré. */
   noneToPink: number;
   noneToGold: number;

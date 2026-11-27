@@ -20,12 +20,13 @@ Légende : ✅ fait · 🧪 en test · ⏳ prévu · 💡 idée
   - **Récap de fin de marche** (style « trophée ») :
     - le bandeau montre ta trace dorée, la durée, la distance et les quartiers traversés ;
     - 3 tuiles : rues passées **de rien à rose**, **de rien à doré**, **de rose à doré** ;
-    - la part de Toulouse gagnée, l'allure et les nouveaux quartiers ;
+    - la part de Toulouse gagnée, l'allure, les pas, le dénivelé et les nouveaux quartiers ;
     - un **record** quand il y en a un (première marche, plus longue marche, record de rues dorées ou ajoutées, sortie la plus matinale) ;
     - **une stat rigolote**, toujours différente : environ 25 stats en 5 familles (équivalences toulousaines, défis, cumuls, clins d'œil aux rues du jour, records). Aucune ne se répète avant que toutes les autres soient passées (historique dans `recaps.json`) ;
     - si la marche a été arrêtée depuis la notification, le récap s'affiche à la prochaine ouverture
   - **Marche trop courte** : à l'arrêt d'une marche de moins de 5 min, une popup propose **Supprimer** (rouge, définitif) ou **Sauvegarder quand même**
   - **Données brutes conservées** : chaque point GPS est écrit dès sa réception et n'est jamais modifié
+  - **Pas et dénivelé** : le podomètre du téléphone compte tes vrais pas, et le baromètre mesure le dénivelé, même écran éteint. Ils sont enregistrés sur chaque point (cumul de pas, pression brute) et sur la marche (total de pas, D+ / D−), en vue de futures features de dépense calorique. Ils s'affichent pendant la marche (les pas) et dans le récap
 - ✅ **Rues parcourues**
   - Chaque **rue entière** (tronçons voisins de même nom) est jugée sur ta **meilleure marche**, sans cumul entre marches
   - **Doré** (validée) : la partie manquante fait au plus 10 m + 3 % de la longueur de la rue

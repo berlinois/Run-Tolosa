@@ -5,6 +5,7 @@ import type { WalkRecap } from './recap.model';
 const recap: WalkRecap = {
   walkId: 'w', startedAt: 0, endedAt: 42 * 60_000, durationMs: 42 * 60_000, distanceM: 3400,
   noneToPink: 9, noneToGold: 4, pinkToGold: 2, quartiers: ['Guilheméry', 'Bonhoure', 'Côte Pavée'], newQuartiers: ['Côte Pavée'],
+  steps: 4812, ascentM: 23.4, descentM: 18.9,
   toulouseBefore: 0.0213, toulouseAfter: 0.0231, trace: [[1.46, 43.6], [1.45, 43.605], [1.442, 43.608]],
   record: { id: 'record-longest', family: 'record', icon: '🏆', text: 'Ta plus longue marche jusqu\'ici : 3,4 km.' },
   fun: { id: 'pont-neuf', family: 'equivalence', icon: '🌉', text: 'Tu as marché 15 Pont-Neuf bout à bout.' },
@@ -27,5 +28,7 @@ describe('RecapCard', () => {
     expect(text).toContain('Nouveau quartier : Côte Pavée');
     expect(text).toContain('+0,18 % de Toulouse');
     expect(text).toContain('4,9 km/h');
+    expect(text).toMatch(/4\s812 pas/);
+    expect(text).toContain('+23 m');
   });
 });

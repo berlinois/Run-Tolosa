@@ -69,6 +69,9 @@ Toulouse en compte environ 30 000 à 50 000, dans `streets/toulouse.geojson`.
 | `pointCount` | `1730` | Contrôle qualité |
 | `processedWith` | `"matcher-v1/osm-2026-11"` | Savoir quoi recalculer |
 | `interrupted` | `true` | Optionnel : marche clôturée sans « Arrêter » |
+| `steps` | `4812` | Pas de la marche (podomètre matériel), si disponible |
+| `ascentM`, `descentM` | `23.4`, `18.9` | Dénivelé positif et négatif (baromètre, lissé, seuil anti-bruit de 1,5 m) |
+| `sensors` | `{ "steps": true, "pressure": true }` | Capteurs disponibles pendant la marche |
 
 **`TrackPoint`** : un point GPS brut, dans `walks/<id>.jsonl`, une ligne JSON par
 point. Il est écrit et flushé dès réception, puis jamais modifié.
@@ -78,7 +81,14 @@ point. Il est écrit et flushé dès réception, puis jamais modifié.
 | `t` | `1795849925000` | Horodatage (ms) |
 | `lat`, `lon` | `43.6045`, `1.4442` | Position (7 décimales) |
 | `acc` | `8` | Précision (m). Au-delà de 25 m, le point est ignoré pour la distance, l'affichage et l'association aux rues |
-| `alt`, `spd` | `146.2`, `1.38` | Altitude (m) et vitesse (m/s), si disponibles |
+| `alt`, `spd` | `146.2`, `1.38` | Altitude GPS (m) et vitesse (m/s), si disponibles |
+| `steps` | `1250` | Cumul de pas depuis le début de la marche (podomètre), si disponible |
+| `hPa` | `1004.37` | Pression atmosphérique brute (baromètre), si disponible : l'altitude et le dénivelé pourront être recalculés plus finement |
+
+Les pas et la pression sont enregistrés **dès maintenant**, en vue de futures
+features de dépense énergétique : calories, effort, optimisation du dénivelé
+d'un parcours. Le podomètre demande la permission « activité physique »
+(facultative) ; le baromètre n'en demande aucune.
 
 **`coverage.json`** : la couverture **brute**, **dérivée** des traces et
 recalculable à tout moment. Il contient :

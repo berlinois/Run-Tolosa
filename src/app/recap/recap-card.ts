@@ -50,6 +50,8 @@ import type { WalkRecap } from './recap.model';
         }
         <span class="chip">📈 +{{ pct(r.toulouseAfter - r.toulouseBefore) }} % de Toulouse <small>(total {{ pct(r.toulouseAfter) }} %)</small></span>
         @if (speed(); as v) { <span class="chip">⚡ {{ v }} km/h</span> }
+        @if (r.steps !== undefined) { <span class="chip">👣 {{ r.steps.toLocaleString('fr-FR') }} pas</span> }
+        @if (r.ascentM !== undefined) { <span class="chip">⛰️ +{{ round(r.ascentM) }} m <small>/ −{{ round(r.descentM ?? 0) }} m</small></span> }
       </div>
 
       <div class="foot">
@@ -126,6 +128,9 @@ export class RecapCard {
     const r = this.recap();
     if (r.durationMs < 60_000 || r.distanceM < 100) return null;
     return ((r.distanceM / 1000) / (r.durationMs / 3_600_000)).toFixed(1).replace('.', ',');
+  }
+  protected round(v: number): number {
+    return Math.round(v);
   }
   protected pct(v: number): string {
     const p = Math.max(0, v) * 100;

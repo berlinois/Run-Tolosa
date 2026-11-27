@@ -59,7 +59,8 @@ export class TrackingStore {
     this.busy.set(true);
     this.error.set(null);
     try {
-      const perms = await Tracking.requestPermissions({ permissions: ['location', 'notifications'] });
+      // « Activité physique » sert au podomètre : facultative, la marche s'enregistre sans.
+      const perms = await Tracking.requestPermissions({ permissions: ['location', 'notifications', 'activity'] });
       if (perms.location !== 'granted') {
         this.error.set('Il faut autoriser la localisation « précise » pour enregistrer une marche.');
         return;

@@ -13,7 +13,11 @@ import { TrackingStore } from './tracking.store';
             <span class="dot"></span>
             <strong>{{ elapsed() }}</strong>
             <span>{{ distance(walk.distanceM) }}</span>
-            <span class="muted">{{ walk.pointCount }} pts</span>
+            @if (walk.steps !== undefined) {
+              <span class="muted">{{ walk.steps.toLocaleString('fr-FR') }} pas</span>
+            } @else {
+              <span class="muted">{{ walk.pointCount }} pts</span>
+            }
           </div>
           <button type="button" class="stop" (click)="confirmStop.set(true)" [disabled]="store.busy()">■ Arrêter</button>
         } @else {

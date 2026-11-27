@@ -11,6 +11,10 @@ export interface TrackPoint {
   alt?: number;
   /** Vitesse en m/s. */
   spd?: number;
+  /** Cumul de pas depuis le début de la marche (podomètre du téléphone). */
+  steps?: number;
+  /** Pression atmosphérique brute (hPa, baromètre) : altitude et dénivelé recalculables. */
+  hPa?: number;
 }
 
 export type WalkStatus = 'recording' | 'finished' | 'processed';
@@ -27,6 +31,13 @@ export interface Walk {
   processedWith: string | null;
   /** Clôturée sans « Arrêter » (téléphone éteint, appli tuée…). */
   interrupted?: boolean;
+  /** Pas de la marche (podomètre), si le téléphone en a un et que la permission est accordée. */
+  steps?: number;
+  /** Dénivelé positif et négatif (m), mesuré au baromètre. */
+  ascentM?: number;
+  descentM?: number;
+  /** Capteurs disponibles pendant cette marche. */
+  sensors?: { steps: boolean; pressure: boolean };
 }
 
 export interface TrackingStatus {

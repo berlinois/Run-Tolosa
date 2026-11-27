@@ -14,6 +14,10 @@ import android.content.pm.ServiceInfo;
 import android.location.Location;
 import android.os.Build;
 import android.os.IBinder;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.Looper;
 import android.util.Log;
 
@@ -75,6 +79,22 @@ public class TrackingService extends Service {
     private BufferedWriter writer;
     private JSONObject meta;
     private Location lastAccepted;
+
+    // ---- Capteurs : podomètre matériel et baromètre (données brutes pour de futures features).
+    private SensorManager sensors;
+    private SensorEventListener sensorListener;
+    /** Pas déjà comptés avant ce démarrage du service (reprise après redémarrage). */
+    private long stepsBefore;
+    /** Valeur brute du podomètre au démarrage (il compte depuis l'allumage du téléphone). */
+    private float stepBaseline = -1;
+    private long steps;
+    /** Dernière pression mesurée (hPa), altitude barométrique lissée, cumuls de dénivelé. */
+    private float pressure = Float.NaN;
+    private double smoothAlt = Double.NaN;
+    private double altRef = Double.NaN;
+    private double ascent, descent;
+    /** Seuil anti-bruit du dénivelé : on ne compte un changement qu'au-delà de 1,5 m. */
+    private static final double ALT_STEP_M = 1.5;
 
     public static boolean isRecording() {
         TrackingService s = running;
@@ -140,6 +160,9 @@ public class TrackingService extends Service {
                 JSONObject existing = walkId != null ? store.readMeta(walkId) : null;
                 if (existing != null && WalkStore.STATUS_RECORDING.equals(existing.optString("status"))) {
                     meta = existing; // reprise après redémarrage du service
+                    stepsBefore = existing.optLong("steps", 0);
+                    ascent = existing.optDouble("ascentM", 0);
+                    descent = existing.optDouble("descentM", 0);
                 } else {
                     long now = System.currentTimeMillis();
                     walkId = WalkStore.newWalkId(now);
@@ -151,6 +174,7 @@ public class TrackingService extends Service {
                         new FileOutputStream(store.trackFile(walkId), true), StandardCharsets.UTF_8));
             }
             requestLocationUpdates();
+            startSensors();
         } catch (Exception e) {
             Log.e(TAG, "Impossible de démarrer la marche", e);
             stopWalk();
@@ -183,6 +207,61 @@ public class TrackingService extends Service {
         locationClient.requestLocationUpdates(request, callback, Looper.getMainLooper());
     }
 
+    /** Podomètre et baromètre, s'ils existent (et si la permission « activité physique » est accordée). */
+    private void startSensors() {
+        sensors = (SensorManager) getSystemService(SENSOR_SERVICE);
+        if (sensors == null) return;
+        Sensor stepSensor = sensors.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
+        Sensor baro = sensors.getDefaultSensor(Sensor.TYPE_PRESSURE);
+        boolean stepsAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED;
+        synchronized (this) {
+            try {
+                JSONObject available = new JSONObject();
+                available.put("steps", stepSensor != null && stepsAllowed);
+                available.put("pressure", baro != null);
+                if (meta != null) meta.put("sensors", available);
+            } catch (Exception ignored) {
+            }
+        }
+        sensorListener = new SensorEventListener() {
+            @Override
+            public void onSensorChanged(SensorEvent e) {
+                synchronized (TrackingService.this) {
+                    if (e.sensor.getType() == Sensor.TYPE_STEP_COUNTER) {
+                        float raw = e.values[0];
+                        if (stepBaseline < 0 || raw < stepBaseline) stepBaseline = raw; // 1re mesure, ou téléphone redémarré
+                        steps = (long) (raw - stepBaseline);
+                    } else if (e.sensor.getType() == Sensor.TYPE_PRESSURE) {
+                        pressure = e.values[0];
+                        double alt = SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure);
+                        smoothAlt = Double.isNaN(smoothAlt) ? alt : smoothAlt * 0.9 + alt * 0.1;
+                        if (Double.isNaN(altRef)) altRef = smoothAlt;
+                        double diff = smoothAlt - altRef;
+                        if (diff >= ALT_STEP_M) { ascent += diff; altRef = smoothAlt; }
+                        else if (diff <= -ALT_STEP_M) { descent -= diff; altRef = smoothAlt; }
+                    }
+                }
+            }
+
+            @Override
+            public void onAccuracyChanged(Sensor sensor, int accuracy) {
+            }
+        };
+        if (stepSensor != null && stepsAllowed) {
+            sensors.registerListener(sensorListener, stepSensor, SensorManager.SENSOR_DELAY_NORMAL);
+        }
+        if (baro != null) {
+            // Une mesure par seconde suffit (on lisse ensuite) : économe en batterie.
+            sensors.registerListener(sensorListener, baro, 1_000_000);
+        }
+    }
+
+    private void stopSensors() {
+        if (sensors != null && sensorListener != null) sensors.unregisterListener(sensorListener);
+        sensorListener = null;
+    }
+
     private void onLocation(Location location) {
         JSONObject point = new JSONObject();
         JSONObject metaCopy;
@@ -195,6 +274,8 @@ public class TrackingService extends Service {
                 point.put("acc", round(location.getAccuracy(), 1));
                 if (location.hasAltitude()) point.put("alt", round(location.getAltitude(), 1));
                 if (location.hasSpeed()) point.put("spd", round(location.getSpeed(), 2));
+                if (stepBaseline >= 0) point.put("steps", stepsBefore + steps);
+                if (!Float.isNaN(pressure)) point.put("hPa", round(pressure, 2));
 
                 writer.write(point.toString());
                 writer.newLine();
@@ -202,6 +283,11 @@ public class TrackingService extends Service {
 
                 int count = meta.getInt("pointCount") + 1;
                 meta.put("pointCount", count);
+                if (stepBaseline >= 0) meta.put("steps", stepsBefore + steps);
+                if (!Double.isNaN(smoothAlt)) {
+                    meta.put("ascentM", round(ascent, 1));
+                    meta.put("descentM", round(descent, 1));
+                }
                 if (location.getAccuracy() <= MAX_ACCURACY_FOR_DISTANCE_M) {
                     if (lastAccepted != null) {
                         meta.put("distanceM", round(meta.getDouble("distanceM") + lastAccepted.distanceTo(location), 1));
@@ -221,6 +307,7 @@ public class TrackingService extends Service {
     }
 
     private void stopWalk() {
+        stopSensors();
         if (callback != null) {
             locationClient.removeLocationUpdates(callback);
             callback = null;
@@ -233,6 +320,11 @@ public class TrackingService extends Service {
             writer = null;
             if (meta != null) {
                 try {
+                    if (stepBaseline >= 0) meta.put("steps", stepsBefore + steps);
+                    if (!Double.isNaN(smoothAlt)) {
+                        meta.put("ascentM", round(ascent, 1));
+                        meta.put("descentM", round(descent, 1));
+                    }
                     meta.put("status", WalkStore.STATUS_FINISHED);
                     meta.put("endedAt", System.currentTimeMillis());
                     store.writeMeta(meta);
@@ -337,6 +429,7 @@ public class TrackingService extends Service {
 
     @Override
     public void onDestroy() {
+        stopSensors();
         if (callback != null) {
             locationClient.removeLocationUpdates(callback);
             callback = null;

@@ -4,6 +4,8 @@ import type { TrackPoint, TrackingStatus, Walk } from './model';
 export interface TrackingPermissions {
   location: PermissionState;
   notifications: PermissionState;
+  /** Podomètre (« activité physique »). */
+  activity: PermissionState;
 }
 
 /** Pont vers android/.../tracking/TrackingPlugin.java */
