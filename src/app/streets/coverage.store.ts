@@ -3,10 +3,16 @@ import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import type { FeatureCollection, LineString } from 'geojson';
 import type { Walk } from '../tracking/model';
 import { Tracking } from '../tracking/tracking.plugin';
-import { MATCHER_ID, matchWalk } from './matcher';
+import { MATCHER_ID, PINK_MIN_RATIO, matchWalk, statusFor, type StreetStatus } from './matcher';
 import { parseStreets, type Streets, type StreetsFile } from './streets';
 
 export interface SegmentCoverage {
+  /** Statut selon la meilleure marche. */
+  status: StreetStatus;
+  /** Meilleure couverture atteinte en une seule marche (0 à 1). */
+  best: number;
+  bestWalkId: string;
+  /** Marches ayant parcouru au moins 30 % du tronçon. */
   passages: number;
   firstAt: number;
   lastAt: number;
@@ -43,7 +49,11 @@ export class CoverageStore {
       features: Object.entries(f.segments).flatMap(([id, cov]) => {
         const s = streets.byId.get(id);
         return s
-          ? [{ type: 'Feature' as const, properties: { id, passages: cov.passages }, geometry: { type: 'LineString' as const, coordinates: s.coords } }]
+          ? [{
+              type: 'Feature' as const,
+              properties: { id, status: cov.status, passages: cov.passages, best: cov.best },
+              geometry: { type: 'LineString' as const, coordinates: s.coords },
+            }]
           : [];
       }),
     };
@@ -52,10 +62,13 @@ export class CoverageStore {
   readonly stats = computed(() => {
     const f = this.file();
     const streets = this.segmentsRef;
-    if (!f || !streets) return { segments: 0, km: 0 };
-    let m = 0;
-    for (const id of Object.keys(f.segments)) m += streets.byId.get(id)?.lengthM ?? 0;
-    return { segments: Object.keys(f.segments).length, km: m / 1000 };
+    const out = { gold: 0, pink: 0, goldKm: 0, pinkKm: 0 };
+    if (!f || !streets) return out;
+    for (const [id, cov] of Object.entries(f.segments)) {
+      const km = (streets.byId.get(id)?.lengthM ?? 0) / 1000;
+      if (cov.status === 'gold') { out.gold++; out.goldKm += km; } else { out.pink++; out.pinkKm += km; }
+    }
+    return out;
   });
 
   /** Prend en compte les marches terminées pas encore comptées (sérialisé). */
@@ -84,11 +97,20 @@ export class CoverageStore {
       const { points } = await Tracking.getTrack({ walkId: walk.id });
       const at = walk.endedAt ?? walk.startedAt;
       const segments: Record<string, SegmentCoverage> = { ...cov.segments };
-      for (const id of matchWalk(points, streets.segments)) {
+      for (const { id, ratio } of matchWalk(points, streets.segments)) {
         const prev = segments[id];
-        segments[id] = prev
-          ? { passages: prev.passages + 1, firstAt: Math.min(prev.firstAt, at), lastAt: Math.max(prev.lastAt, at), lastWalkId: walk.id }
-          : { passages: 1, firstAt: at, lastAt: at, lastWalkId: walk.id };
+        const isBest = !prev || ratio > prev.best;
+        const best = isBest ? ratio : prev.best;
+        const passage = ratio >= PINK_MIN_RATIO ? 1 : 0;
+        segments[id] = {
+          status: statusFor(best, streets.byId.get(id)?.lengthM ?? 0) ?? 'pink',
+          best,
+          bestWalkId: isBest ? walk.id : prev.bestWalkId,
+          passages: (prev?.passages ?? 0) + passage,
+          firstAt: Math.min(prev?.firstAt ?? at, at),
+          lastAt: Math.max(prev?.lastAt ?? at, at),
+          lastWalkId: at >= (prev?.lastAt ?? 0) ? walk.id : prev.lastWalkId,
+        };
       }
       cov = { processedWith, walkIds: [...cov.walkIds, walk.id], segments };
       await this.writeFile(cov);

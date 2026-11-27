@@ -21,6 +21,9 @@ import { TrackingStore } from '../tracking/tracking.store';
 const TOULOUSE_CENTER: [number, number] = [1.4442, 43.6045];
 const STREET_COLOR = '#F2B705';
 const STREET_CASING = '#9A6B00';
+/** Rue parcourue (≥ 30 %) mais pas validée. */
+const PINK_COLOR = '#EC6A9C';
+const PINK_CASING = '#8E2450';
 const LIVE_COLOR = '#1E88E5';
 
 @Component({
@@ -30,10 +33,13 @@ const LIVE_COLOR = '#1E88E5';
     <div #mapEl class="map"></div>
 
     <aside class="legend">
-      <div><span class="swatch street"></span>Rue parcourue</div>
+      <div><span class="swatch street"></span>Rue validée</div>
+      <div><span class="swatch pink"></span>Rue parcourue</div>
       <div><span class="swatch live"></span>Marche en cours</div>
-      @if (coverage.stats().segments > 0) {
-        <div class="stats">{{ km() }} de rues · {{ coverage.stats().segments }} tronçons</div>
+      @if (coverage.stats(); as st) {
+        @if (st.gold + st.pink > 0) {
+          <div class="stats">{{ km(st.goldKm) }} validés · {{ km(st.pinkKm) }} parcourus</div>
+        }
       }
       @if (coverage.error(); as err) {
         <div class="err">{{ err }}</div>
@@ -89,6 +95,7 @@ const LIVE_COLOR = '#1E88E5';
     .version { margin-top: 4px; color: #757575; font-size: 11px; }
     .swatch { display: inline-block; width: 18px; margin-right: 6px; vertical-align: middle; border-radius: 3px; }
     .swatch.street { height: 6px; background: #F2B705; box-shadow: 0 0 0 1px #9A6B00; }
+    .swatch.pink { height: 6px; background: #EC6A9C; box-shadow: 0 0 0 1px #8E2450; }
     .swatch.live { height: 3px; background: #1E88E5; }
     .stats { margin-top: 4px; font-weight: 600; color: #6d4c00; }
     .err { margin-top: 4px; color: #c62828; max-width: 220px; }
@@ -254,7 +261,11 @@ export class MapView implements OnDestroy {
         type: 'line',
         source: 'streets',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': dark ? '#000000' : STREET_CASING, 'line-width': width(8), 'line-opacity': dark ? 0.6 : 0.5 },
+        paint: {
+          'line-color': dark ? '#000000' : ['match', ['get', 'status'], 'gold', STREET_CASING, PINK_CASING],
+          'line-width': width(8),
+          'line-opacity': dark ? 0.6 : 0.5,
+        },
       },
       beforeLabels,
     );
@@ -264,7 +275,11 @@ export class MapView implements OnDestroy {
         type: 'line',
         source: 'streets',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': STREET_COLOR, 'line-width': width(6), 'line-opacity': 0.92 },
+        paint: {
+          'line-color': ['match', ['get', 'status'], 'gold', STREET_COLOR, PINK_COLOR],
+          'line-width': width(6),
+          'line-opacity': 0.92,
+        },
       },
       beforeLabels,
     );
@@ -382,8 +397,8 @@ export class MapView implements OnDestroy {
     map.fitBounds(bounds, { padding: { top: 64, bottom: 96, left: 8, right: 8 }, bearing: 0, pitch: 0, duration: 900 });
   }
 
-  protected km(): string {
-    return `${this.coverage.stats().km.toFixed(1).replace('.', ',')} km`;
+  protected km(value: number): string {
+    return `${value.toFixed(1).replace('.', ',')} km`;
   }
 
   /** Message temporaire en bas de l'écran. */

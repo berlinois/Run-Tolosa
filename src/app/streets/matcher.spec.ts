@@ -1,5 +1,5 @@
 import type { TrackPoint } from '../tracking/model';
-import { matchWalk } from './matcher';
+import { matchWalk, statusFor } from './matcher';
 import type { StreetSegment } from './streets';
 
 // ~1 m ≈ 0.000009° de latitude à Toulouse ; ~0.0000124° de longitude.
@@ -17,28 +17,51 @@ function seg(id: string, len: number, north = 0, east = 0): StreetSegment {
 /** Marche en ligne droite est-ouest de `from` à `to` m, un point par 1,5 m, décalée de `north` m. */
 function walk(from: number, to: number, north = 0, acc = 5): TrackPoint[] {
   const pts: TrackPoint[] = [];
-  for (let m = from; m <= to; m += 1.5) {
-    pts.push({ t: m * 1000, lat: LAT0 + north * DLAT, lon: LON0 + m * DLON, acc });
-  }
+  for (let m = from; m <= to; m += 1.5) pts.push({ t: m * 1000, lat: LAT0 + north * DLAT, lon: LON0 + m * DLON, acc });
   return pts;
 }
 
+const statusOf = (pts: TrackPoint[], s: StreetSegment) => {
+  const m = matchWalk(pts, [s])[0];
+  return m ? statusFor(m.ratio, s.lengthM) : null;
+};
+
+describe('statusFor', () => {
+  it('doré si la partie manquante tient dans 10 m + 3 % de la longueur', () => {
+    expect(statusFor(0.9, 100)).toBe('gold'); // 10 m manquants ≤ 13 m
+    expect(statusFor(0.86, 100)).toBe('pink'); // 14 m > 13 m
+    expect(statusFor(0.96, 1000)).toBe('gold'); // 40 m ≤ 40 m
+    expect(statusFor(0.95, 1000)).toBe('pink'); // 50 m > 40 m
+    expect(statusFor(0.7, 30)).toBe('gold'); // petite rue : 9 m ≤ 10,9 m
+  });
+
+  it("ne valide pas un tout petit tronçon qu'on n'a pas (assez) parcouru", () => {
+    expect(statusFor(0, 4)).toBeNull();
+    expect(statusFor(0.4, 8)).toBe('pink');
+    expect(statusFor(0.6, 8)).toBe('gold');
+  });
+
+  it('rose à partir de 30 %, rien en dessous', () => {
+    expect(statusFor(0.3, 200)).toBe('pink');
+    expect(statusFor(0.29, 200)).toBeNull();
+  });
+});
+
 describe('matchWalk', () => {
-  it('valide une rue parcourue en entier, même avec un décalage GPS de 8 m', () => {
-    expect(matchWalk(walk(0, 100, 8), [seg('a', 100)])).toEqual(['a']);
+  it('rue parcourue en entier, même avec un décalage GPS de 8 m : doré', () => {
+    expect(statusOf(walk(0, 100, 8), seg('a', 100))).toBe('gold');
   });
 
-  it('valide à partir de 60 % de la longueur, pas en dessous', () => {
-    expect(matchWalk(walk(0, 65), [seg('a', 100)])).toEqual(['a']);
-    expect(matchWalk(walk(0, 50), [seg('a', 100)])).toEqual([]);
+  it('rue faite à moitié : rose ; à 20 % : rien', () => {
+    expect(statusOf(walk(0, 50), seg('a', 100))).toBe('pink');
+    expect(statusOf(walk(0, 20), seg('a', 300))).toBeNull();
   });
 
-  it("ne valide pas une rue parallèle à plus de 12 m", () => {
-    expect(matchWalk(walk(0, 100), [seg('a', 100), seg('parallele', 100, 25)])).toEqual(['a']);
+  it('ne compte pas une rue parallèle à plus de 12 m', () => {
+    expect(matchWalk(walk(0, 100), [seg('a', 100), seg('parallele', 100, 25)]).map((m) => m.id)).toEqual(['a']);
   });
 
-  it('ne valide pas une rue seulement croisée', () => {
-    // Rue nord-sud de 80 m traversée au milieu par la marche est-ouest.
+  it('ne compte pas une rue seulement croisée', () => {
     const lon = LON0 + 50 * DLON;
     const cross: StreetSegment = {
       id: 'croisee', name: '', highway: 'residential', district: '', lengthM: 80,
@@ -48,19 +71,18 @@ describe('matchWalk', () => {
     expect(matchWalk(walk(0, 100), [cross])).toEqual([]);
   });
 
+  it("ne compte pas un court tronçon d'intersection simplement traversé", () => {
+    const pts: TrackPoint[] = [];
+    for (let m = -40; m <= 40; m += 1.5) pts.push({ t: m, lat: LAT0 + m * DLAT, lon: LON0, acc: 5 });
+    expect(statusOf(pts, seg('court', 40))).toBeNull();
+  });
+
   it('ignore les points imprécis', () => {
     expect(matchWalk(walk(0, 100, 0, 60), [seg('a', 100)])).toEqual([]);
   });
 
-  it("ne valide pas un court tronçon d'intersection simplement traversé", () => {
-    // Marche nord-sud qui passe par l'extrémité d'un tronçon est-ouest de 15 m.
-    const pts: TrackPoint[] = [];
-    for (let m = -40; m <= 40; m += 1.5) pts.push({ t: m, lat: LAT0 + m * DLAT, lon: LON0, acc: 5 });
-    expect(matchWalk(pts, [seg('court', 15)])).toEqual([]);
-  });
-
   it('comble les petits trous de la trace', () => {
     const pts = walk(0, 100).filter((_, i) => i % 15 === 0); // un point tous les ~22 m
-    expect(matchWalk(pts, [seg('a', 100)])).toEqual(['a']);
+    expect(statusOf(pts, seg('a', 100))).toBe('gold');
   });
 });

@@ -89,7 +89,9 @@ recalculé quand une marche est supprimée.
 | Champ | Exemple | Rôle |
 |---|---|---|
 | `segmentId` | `"w12345:3"` | Lien vers le tronçon |
-| `passages` | `4` | Nombre de marches où le tronçon est validé : c'est la couleur |
+| `status` | `"gold"` / `"pink"` | Doré (validé) ou rose (parcouru), selon la meilleure marche : c'est la couleur |
+| `best`, `bestWalkId` | `0.94`, `"2026-11-27T07-12-05"` | Meilleure couverture en une marche, et cette marche |
+| `passages` | `4` | Nombre de marches qui ont fait au moins 30 % du tronçon |
 | `firstAt` / `lastAt` | ms epoch | Couleur selon l'ancienneté, date de découverte |
 | `lastWalkId` | `"2026-11-27T07-12-05"` | Dernière marche |
 
@@ -135,9 +137,17 @@ réglés sur une vraie marche : un point par seconde, précision médiane de 4,5
    sur le côté et à moins de **5 m** dans le sens de la rue. Grâce à cette
    tolérance de 5 m, une rue simplement croisée, ou faite à moitié, n'est pas
    « étirée » par le rayon.
-4. **La validation** : un tronçon est validé pour une marche si au moins **60 %**
-   de sa longueur est couverte. Chaque marche qui valide le tronçon ajoute 1 à
-   `passages`.
+4. **Le statut**, calculé sur **la meilleure marche**, sans cumul entre
+   marches :
+   - **doré** (rue validée) : sur une même marche, la partie non parcourue
+     fait au plus **10 m + 3 % de la longueur**, avec au moins 50 % parcourus.
+     Ça laisse 13 m sur 100 m et 40 m sur 1 km ;
+   - **rose** (rue parcourue) : au moins **30 %** parcourus sur une marche ;
+   - sinon, pas de statut.
+
+   `passages` compte les marches qui ont fait au moins 30 % du tronçon.
+   `best` et `bestWalkId` gardent la meilleure couverture et la marche
+   correspondante.
 
 Si on change un seuil, on change `MATCHER_ID` : tout est alors recalculé
 automatiquement à partir des traces brutes.

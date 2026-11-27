@@ -2,15 +2,40 @@ import type { TrackPoint } from '../tracking/model';
 import type { StreetSegment } from './streets';
 
 /**
- * Association points GPS → tronçons de rue.
- * Un tronçon est validé pour une marche si au moins COVERAGE_RATIO de sa
- * longueur passe à moins de MATCH_RADIUS_M d'un point de la trace.
- * Changer un paramètre = changer MATCHER_ID : tout est recalculé.
+ * Association points GPS → tronçons de rue, marche par marche (pas de cumul
+ * entre marches : une rue est jugée sur la meilleure marche).
+ *  - rose : au moins PINK_MIN_RATIO de la longueur parcourue en une marche ;
+ *  - doré : en une marche, la partie non parcourue fait au plus
+ *           GOLD_BASE_TOLERANCE_M + GOLD_TOLERANCE_RATIO × longueur
+ *           (marge plus large pour les petites rues, plus stricte pour les longues).
+ * Changer un paramètre = changer MATCHER_ID : tout est recalculé depuis les traces.
  */
-export const MATCHER_ID = 'matcher-v1';
+export const MATCHER_ID = 'matcher-v2';
 export const MAX_POINT_ACCURACY_M = 25;
 export const MATCH_RADIUS_M = 12;
-export const COVERAGE_RATIO = 0.6;
+export const PINK_MIN_RATIO = 0.3;
+export const GOLD_BASE_TOLERANCE_M = 10;
+export const GOLD_TOLERANCE_RATIO = 0.03;
+export const GOLD_MIN_RATIO = 0.5;
+
+export type StreetStatus = 'gold' | 'pink';
+
+/** Statut d'un tronçon pour une couverture donnée (part de la longueur, 0 à 1). */
+export function statusFor(ratio: number, lengthM: number): StreetStatus | null {
+  if (ratio < PINK_MIN_RATIO) return null;
+  const missing = (1 - ratio) * lengthM;
+  // Garde-fou : sur un tout petit tronçon, la marge de 10 m suffirait à le valider
+  // sans l'avoir parcouru ; on exige au moins la moitié pour le doré.
+  if (ratio >= GOLD_MIN_RATIO && missing <= GOLD_BASE_TOLERANCE_M + GOLD_TOLERANCE_RATIO * lengthM + 1e-6) return 'gold';
+  return 'pink';
+}
+
+/** Couverture d'un tronçon par une marche. */
+export interface SegmentMatch {
+  id: string;
+  /** Part de la longueur parcourue, de 0 à 1. */
+  ratio: number;
+}
 /** Pas d'échantillonnage le long des tronçons. */
 const SAMPLE_STEP_M = 4;
 /**
@@ -71,8 +96,8 @@ class PointGrid {
   }
 }
 
-/** Ids des tronçons validés par une marche. */
-export function matchWalk(points: readonly TrackPoint[], segments: readonly StreetSegment[]): string[] {
+/** Tronçons parcourus par une marche (rose ou doré), avec leur couverture. */
+export function matchWalk(points: readonly TrackPoint[], segments: readonly StreetSegment[]): SegmentMatch[] {
   const good = points.filter((p) => p.acc <= MAX_POINT_ACCURACY_M);
   if (good.length < 2) return [];
 
@@ -101,13 +126,14 @@ export function matchWalk(points: readonly TrackPoint[], segments: readonly Stre
   const mLat = MATCH_RADIUS_M / M_PER_DEG_LAT;
   const mLon = MATCH_RADIUS_M / (111_320 * Math.cos((good[0].lat * Math.PI) / 180));
 
-  const validated: string[] = [];
+  const matched: SegmentMatch[] = [];
   for (const s of segments) {
     const [a, b, c, d] = s.bbox;
     if (c < minLon - mLon || a > maxLon + mLon || d < minLat - mLat || b > maxLat + mLat) continue;
-    if (coveredRatio(s, proj, grid) >= COVERAGE_RATIO) validated.push(s.id);
+    const ratio = coveredRatio(s, proj, grid);
+    if (statusFor(ratio, s.lengthM)) matched.push({ id: s.id, ratio: Math.round(ratio * 1000) / 1000 });
   }
-  return validated;
+  return matched;
 }
 
 /** Part de la longueur du tronçon à moins de MATCH_RADIUS_M de la trace. */
