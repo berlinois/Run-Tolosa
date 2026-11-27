@@ -11,8 +11,8 @@ import {
 } from '@angular/core';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
-import { Map as MlMap, type GeoJSONSource } from 'maplibre-gl';
-import type { Feature, Point } from 'geojson';
+import { Map as MlMap, Marker, type GeoJSONSource } from 'maplibre-gl';
+import type { Feature, FeatureCollection, MultiLineString, Point } from 'geojson';
 import { LocationService } from '../core/location.service';
 import { BASEMAPS, basemapById, loadBasemapChoice, saveBasemapChoice, type Basemap, type BasemapId } from './basemaps';
 import { CoverageStore } from '../streets/coverage.store';
@@ -125,6 +125,9 @@ export class MapView implements OnDestroy {
   private readonly styleReady = signal(0);
   private readonly myPosition = signal<Feature<Point> | null>(null);
   private statusTimer?: ReturnType<typeof setTimeout>;
+  /** Contours des quartiers (test d'affichage, public/streets/quartiers.geojson). */
+  private readonly districts = signal<FeatureCollection<MultiLineString> | null>(null);
+  private districtMarkers: Marker[] = [];
 
   protected readonly coverage = inject(CoverageStore);
   protected readonly basemaps = BASEMAPS;
@@ -152,6 +155,11 @@ export class MapView implements OnDestroy {
     });
     effect(() => {
       if (!this.styleReady()) return;
+      const d = this.districts();
+      if (d) this.source('districts')?.setData(d);
+    });
+    effect(() => {
+      if (!this.styleReady()) return;
       this.source('me')?.setData(this.myPosition() ?? { type: 'FeatureCollection', features: [] });
     });
   }
@@ -174,6 +182,7 @@ export class MapView implements OnDestroy {
       this.addOverlays(map);
       this.styleReady.update((n) => n + 1);
     });
+    void this.loadDistricts(map);
     // À l'ouverture : centrer sur ma position (sans message ; Toulouse par défaut si échec).
     if (Capacitor.isNativePlatform()) {
       map.once('load', () => void this.locate(true));
@@ -196,6 +205,27 @@ export class MapView implements OnDestroy {
     const dark = this.basemap().dark;
     const width = (base: number) =>
       ['interpolate', ['exponential', 1.6], ['zoom'], 12, base * 0.4, 15, base, 18, base * 2.6] as never;
+
+    // Contours des quartiers : pointillés rose brique, sous les rues dorées.
+    map.addSource('districts', { type: 'geojson', data: empty });
+    map.addLayer(
+      {
+        id: 'districts-halo',
+        type: 'line',
+        source: 'districts',
+        paint: { 'line-color': '#ffffff', 'line-width': 5, 'line-opacity': dark ? 0.15 : 0.6 },
+      },
+      beforeLabels,
+    );
+    map.addLayer(
+      {
+        id: 'districts',
+        type: 'line',
+        source: 'districts',
+        paint: { 'line-color': dark ? '#F48FB1' : '#B8505E', 'line-width': 2.2, 'line-dasharray': [3, 2] },
+      },
+      beforeLabels,
+    );
 
     map.addSource('streets', { type: 'geojson', data: empty });
     map.addLayer(
@@ -242,6 +272,26 @@ export class MapView implements OnDestroy {
     });
   }
 
+  private async loadDistricts(map: MlMap): Promise<void> {
+    try {
+      const res = await fetch('streets/quartiers.geojson');
+      if (!res.ok) return;
+      const data = (await res.json()) as FeatureCollection<MultiLineString>;
+      this.districts.set(data);
+      // Noms des quartiers : marqueurs HTML (indépendants des polices du fond de carte).
+      this.districtMarkers = data.features.map((f) => {
+        const el = document.createElement('div');
+        el.className = 'district-label';
+        const ref = f.properties?.['ref'];
+        el.textContent = `${ref ? `${ref} · ` : ''}${f.properties?.['name'] ?? ''}`;
+        const { labelLon, labelLat } = f.properties as { labelLon: number; labelLat: number };
+        return new Marker({ element: el }).setLngLat([labelLon, labelLat]).addTo(map);
+      });
+    } catch {
+      // affichage de test : sans contours, la carte fonctionne normalement
+    }
+  }
+
   protected km(): string {
     return `${this.coverage.stats().km.toFixed(1).replace('.', ',')} km`;
   }
@@ -271,6 +321,7 @@ export class MapView implements OnDestroy {
 
   ngOnDestroy(): void {
     clearTimeout(this.statusTimer);
+    this.districtMarkers.forEach((m) => m.remove());
     this.map?.remove();
   }
 }

@@ -1,3 +1,18 @@
 @use 'maplibre-gl/dist/maplibre-gl.css';
 
 html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
+
+/* Noms des quartiers (marqueurs MapLibre, hors composant). */
+.district-label {
+  max-width: 130px;
+  padding: 3px 7px;
+  border-radius: 8px;
+  background: #fffd;
+  color: #8e3646;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  box-shadow: 0 1px 3px #0003;
+  pointer-events: none;
+}
