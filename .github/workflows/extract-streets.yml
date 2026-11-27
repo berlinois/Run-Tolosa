@@ -8,7 +8,7 @@ on:
       what:
         description: "Quoi extraire : tout, rues ou quartiers"
         type: choice
-        options: [tout, rues, quartiers, iris, sonde]
+        options: [tout, rues, quartiers, iris, eau, sonde]
         default: tout
   push:
     paths:
@@ -16,6 +16,7 @@ on:
       - scripts/extract-districts.mjs
       - scripts/extract-iris.mjs
       - scripts/build-neighbourhoods.mjs
+      - scripts/extract-water.mjs
       - .github/workflows/extract-streets.yml
 
 concurrency:
@@ -50,6 +51,10 @@ jobs:
         run: |
           node scripts/extract-iris.mjs
           node scripts/build-neighbourhoods.mjs
+
+      - name: Extraction de la Garonne et des canaux
+        if: ${{ github.event_name == 'push' || inputs.what == 'tout' || inputs.what == 'eau' }}
+        run: node scripts/extract-water.mjs
 
       - name: Commit du référentiel
         run: |
